@@ -35,6 +35,7 @@ pocketsmith:
 
 sensor:
   - platform: pocketsmith
+```
 
 2. **Restart Home Assistant**:
 Restart Home Assistant to apply the changes.
