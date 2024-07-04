@@ -22,3 +22,5 @@ custom_components/
 ├── manifest.json
 ├── const.py
 └── sensor.py
+![LPHHgmmRQz8yXE1v3khgVT](https://github.com/cloudbr34k84/home-assistant-pocketsmith/assets/58960644/ab51d2a9-2c42-4244-8dd8-708f6ee02a36)
+
