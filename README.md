@@ -36,20 +36,84 @@ pocketsmith:
 sensor:
   - platform: pocketsmith
 ```
-
 2. **Restart Home Assistant**:
 Restart Home Assistant to apply the changes.
 
-**Usage**
+## Automation Examples
+**Notify on Low Balance**:
+Send a notification if an account balance falls below a certain threshold.
+```
+alias: Notify on Low Balance
+trigger:
+  - platform: numeric_state
+    entity_id: sensor.pocketsmith_account_123_balance
+    below: 100
+action:
+  - service: notify.notify
+    data:
+      title: "Low Balance Alert"
+      message: "Your PocketSmith account balance is below $100."
+```
+**Log Balances Daily**:
+Log the account balances to a file or Google Sheets daily.
+```
+alias: Log PocketSmith Balances
+trigger:
+  - platform: time
+    at: "00:00:00"
+action:
+  - service: rest_command.log_balance
+    data_template:
+      balance: "{{ states('sensor.pocketsmith_account_123_balance') }}"
+```
+**Monthly Balance Summary**:
+Send a summary of your account balances at the end of each month.
+```
+alias: Monthly Balance Summary
+trigger:
+  - platform: time
+    at: "00:00:00"
+  - platform: template
+    value_template: "{{ now().day == 1 }}"
+action:
+  - service: notify.notify
+    data_template:
+      title: "Monthly Balance Summary"
+      message: >
+        PocketSmith Account Balances:
+        - Account 123: {{ states('sensor.pocketsmith_account_123_balance') }}
+        - Account 456: {{ states('sensor.pocketsmith_account_456_balance') }}
+```
+**Balance Change Alert**:
+Notify if there's a significant change in balance.
+```
+alias: Balance Change Alert
+trigger:
+  - platform: state
+    entity_id: sensor.pocketsmith_account_123_balance
+condition:
+  - condition: template
+    value_template: "{{ (trigger.to_state.state | float) - (trigger.from_state.state | float) > 500 }}"
+action:
+  - service: notify.notify
+    data_template:
+      title: "Balance Change Alert"
+      message: "Your PocketSmith account balance has changed significantly: {{ trigger.to_state.state }}."
+```
+
+
+
+## Usage
+
 Once configured, your PocketSmith accounts will appear as sensors in Home Assistant with the current balance and the appropriate unit of measurement.
 
-**Troubleshooting**
+## Troubleshooting
 Duplicate Sensors: If duplicate sensors appear, ensure you have unique IDs and that the integration is not being reloaded multiple times.
 No Balance Displayed: Check Home Assistant logs for errors related to fetching balance and ensure the correct API keys are used.
 Contributions
 Feel free to contribute to this integration by submitting issues or pull requests to the GitHub repository.
 
-**License**
+## License
 This project is licensed under the MIT License.
 
 
