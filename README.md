@@ -17,8 +17,8 @@ Initializes the PocketSmith platform by retrieving the developer key from Home A
 
 **PocketSmithAccountSensor Class**:
 Represents a sensor for a PocketSmith account.
- - Initializes with the developer key, user ID, and account information.
-   **Properties**:
+Initializes with the developer key, user ID, and account information.
+**Properties**:
     - **unique_id**: Generates a unique ID for each sensor.
     - **name**: Returns the sensor's name.
     - **state**: Returns the current state of the sensor (account balance).
@@ -28,8 +28,8 @@ Represents a sensor for a PocketSmith account.
 
 **PocketSmithTransactionAccountSensor Class**:
 Represents a sensor for a PocketSmith transaction account.
- - Initializes with the developer key, user ID, and transaction account information.
-   **Properties**:
+Initializes with the developer key, user ID, and transaction account information.
+**Properties**:
     - **unique_id**: Generates a unique ID for each sensor.
     - **name**: Returns the sensor's name.
     - **state**: Returns the current state of the sensor (transaction account balance).
@@ -40,7 +40,7 @@ Represents a sensor for a PocketSmith transaction account.
 **PocketSmithUncategorizedTransactionsSensor Class**:
 Represents a sensor to count uncategorized transactions.
 Initializes with the developer key and user ID.
- **Properties**:
+**Properties**:
   - **unique_id** Generates a unique ID for each sensor.
   - **name**: Returns the sensor's name.
   - **state** Returns the current state of the sensor (number of uncategorized transactions).
@@ -49,15 +49,16 @@ Initializes with the developer key and user ID.
 **PocketSmithTotalTransactionsSensor Class**:
 Represents a sensor to count total transactions and their respective debit and credit counts.
 Initializes with the developer key and user ID.
- **Properties**:
+**Properties**:
   - **unique_id** Generates a unique ID for each sensor.
   - **name**: Returns the sensor's name.
   - **state** Returns the current state of the sensor (total number of transactions).
   - **extra_state_attributes** Returns additional state attributes (total count of debit and credit transactions).
+
 **PocketSmithNetWorthSensor Class**:
 Represents a sensor to calculate and show the total net worth.
 Initializes with the developer key and user ID.
- **Properties**:
+**Properties**:
    - **unique_id** Generates a unique ID for each sensor.
    - **name**: Returns the sensor's name.
    - **state** Returns the current state of the sensor (total net worth).
