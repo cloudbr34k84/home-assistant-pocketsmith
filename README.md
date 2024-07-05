@@ -4,70 +4,70 @@
 The PocketSmith integration allows you to display account balances from PocketSmith in Home Assistant.
 
 ## Detailed Comments Explanation:
+
 **Setup Platform (async_setup_platform)**:
- - Initializes the PocketSmith platform by retrieving the developer key from Home Assistant's data.
- - Fetches the user ID using the developer key.
+Initializes the PocketSmith platform by retrieving the developer key from Home Assistant's data.
+ - Fetches the user ID using the **developer key**.
  - Retrieves user accounts using the user ID.
- - Adds PocketSmithAccountSensor entities for each user account.
- - Adds PocketSmithTransactionAccountSensor entities for each transaction account associated with the user accounts.
- - Adds PocketSmithUncategorizedTransactionsSensor to count the number of uncategorized transactions.
- - Adds PocketSmithTotalTransactionsSensor to count the total number of transactions and their respective debit and credit counts.
- - Adds PocketSmithNetWorthSensor to calculate and show the total net worth.
+ - Adds **PocketSmithAccountSensor** entities for each user account.
+ - Adds **PocketSmithTransactionAccountSensor** entities for each transaction account associated with the user accounts.
+ - Adds **PocketSmithUncategorizedTransactionsSensor** to count the number of uncategorized transactions.
+ - Adds **PocketSmithTotalTransactionsSensor** to count the total number of transactions and their respective debit and credit counts.
+ - Adds **PocketSmithNetWorthSensor** to calculate and show the total net worth.
 
 **PocketSmithAccountSensor Class**:
 Represents a sensor for a PocketSmith account.
  - Initializes with the developer key, user ID, and account information.
-   Properties:
-    - unique_id: Generates a unique ID for each sensor.
-    - name: Returns the sensor's name.
-    - state: Returns the current state of the sensor (account balance).
-    - unit_of_measurement: Returns the unit of measurement for the sensor.
-    - device_class: Returns the device class.
-    - extra_state_attributes: Returns additional state attributes.
+   **Properties**:
+    - **unique_id**: Generates a unique ID for each sensor.
+    - **name**: Returns the sensor's name.
+    - **state**: Returns the current state of the sensor (account balance).
+    - **unit_of_measurement**: Returns the unit of measurement for the sensor.
+    - **device_class**: Returns the device class.
+    - **extra_state_attributes**: Returns additional state attributes.
 
 **PocketSmithTransactionAccountSensor Class**:
 Represents a sensor for a PocketSmith transaction account.
  - Initializes with the developer key, user ID, and transaction account information.
-   Properties:
-    - unique_id: Generates a unique ID for each sensor.
-    - name: Returns the sensor's name.
-    - state: Returns the current state of the sensor (transaction account balance).
-    - unit_of_measurement: Returns the unit of measurement for the sensor.
-    - device_class: Returns the device class.
-    - extra_state_attributes: Returns additional state attributes.
-    - PocketSmithUncategorizedTransactionsSensor Class:
-
+   **Properties**:
+    - **unique_id**: Generates a unique ID for each sensor.
+    - **name**: Returns the sensor's name.
+    - **state**: Returns the current state of the sensor (transaction account balance).
+    - **unit_of_measurement** Returns the unit of measurement for the sensor.
+    - **device_class** Returns the device class.
+    - **extra_state_attributes** Returns additional state attributes.
+ 
+**PocketSmithUncategorizedTransactionsSensor Class**:
 Represents a sensor to count uncategorized transactions.
 Initializes with the developer key and user ID.
-Properties:
-unique_id: Generates a unique ID for each sensor.
-name: Returns the sensor's name.
-state: Returns the current state of the sensor (number of uncategorized transactions).
-extra_state_attributes: Returns additional state attributes.
-PocketSmithTotalTransactionsSensor Class:
+ **Properties**:
+  - **unique_id** Generates a unique ID for each sensor.
+  - **name**: Returns the sensor's name.
+  - **state** Returns the current state of the sensor (number of uncategorized transactions).
+  - **extra_state_attributes** Returns additional state attributes.
 
+**PocketSmithTotalTransactionsSensor Class**:
 Represents a sensor to count total transactions and their respective debit and credit counts.
 Initializes with the developer key and user ID.
-Properties:
-unique_id: Generates a unique ID for each sensor.
-name: Returns the sensor's name.
-state: Returns the current state of the sensor (total number of transactions).
-extra_state_attributes: Returns additional state attributes (total count of debit and credit transactions).
-PocketSmithNetWorthSensor Class:
-
+ **Properties**:
+  - **unique_id** Generates a unique ID for each sensor.
+  - **name**: Returns the sensor's name.
+  - **state** Returns the current state of the sensor (total number of transactions).
+  - **extra_state_attributes** Returns additional state attributes (total count of debit and credit transactions).
+**PocketSmithNetWorthSensor Class**:
 Represents a sensor to calculate and show the total net worth.
 Initializes with the developer key and user ID.
-Properties:
-unique_id: Generates a unique ID for each sensor.
-name: Returns the sensor's name.
-state: Returns the current state of the sensor (total net worth).
-unit_of_measurement: Returns the unit of measurement for the sensor.
-device_class: Returns the device class.
-Helper Functions:
+ **Properties**:
+   - **unique_id** Generates a unique ID for each sensor.
+   - **name**: Returns the sensor's name.
+   - **state** Returns the current state of the sensor (total net worth).
+   - **unit_of_measurement** Returns the unit of measurement for the sensor.
+   - **device_class** Returns the device class.
 
-get_user_id: Retrieves the user ID using the developer key.
-get_user_accounts: Retrieves the user's accounts using the user ID.
-get_transaction_accounts: Retrieves the transaction accounts for a specific account.
+**Helper Functions**:
+- **get_user_id**: Retrieves the user ID using the developer key.
+- **get_user_accounts**: Retrieves the user's accounts using the user ID.
+- **get_transaction_accounts**: Retrieves the transaction accounts for a specific account.
 
 ## Prerequisites
 - A running Home Assistant instance.
