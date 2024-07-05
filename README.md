@@ -30,12 +30,12 @@ Initializes with the developer key, user ID, and account information.
 Represents a sensor for a PocketSmith transaction account.
 Initializes with the developer key, user ID, and transaction account information.
 **Properties**:
-    - **unique_id**: Generates a unique ID for each sensor.
-    - **name**: Returns the sensor's name.
-    - **state**: Returns the current state of the sensor (transaction account balance).
-    - **unit_of_measurement** Returns the unit of measurement for the sensor.
-    - **device_class** Returns the device class.
-    - **extra_state_attributes** Returns additional state attributes.
+ - **unique_id**: Generates a unique ID for each sensor.
+ - **name**: Returns the sensor's name.
+ - **state**: Returns the current state of the sensor (transaction account balance).
+ - **unit_of_measurement** Returns the unit of measurement for the sensor.
+ - **device_class** Returns the device class.
+ - **extra_state_attributes** Returns additional state attributes.
  
 **PocketSmithUncategorizedTransactionsSensor Class**:
 Represents a sensor to count uncategorized transactions.
