@@ -9,11 +9,11 @@ The PocketSmith integration allows you to display account balances from PocketSm
 Initializes the PocketSmith platform by retrieving the developer key from Home Assistant's data.
  - Fetches the user ID using the **developer key**.
  - Retrieves user accounts using the user ID.
- - Adds **PocketSmithAccountSensor** entities for each user account.
- - Adds **PocketSmithTransactionAccountSensor** entities for each transaction account associated with the user accounts.
- - Adds **PocketSmithUncategorizedTransactionsSensor** to count the number of uncategorized transactions.
- - Adds **PocketSmithTotalTransactionsSensor** to count the total number of transactions and their respective debit and credit counts.
- - Adds **PocketSmithNetWorthSensor** to calculate and show the total net worth.
+  - Adds **PocketSmithAccountSensor** entities for each user account.
+  - Adds **PocketSmithTransactionAccountSensor** entities for each transaction account associated with the user accounts.
+  - Adds **PocketSmithUncategorizedTransactionsSensor** to count the number of uncategorized transactions.
+  - Adds **PocketSmithTotalTransactionsSensor** to count the total number of transactions and their respective debit and credit counts.
+  - Adds **PocketSmithNetWorthSensor** to calculate and show the total net worth.
 
 **PocketSmithAccountSensor Class**:
 Represents a sensor for a PocketSmith account.
