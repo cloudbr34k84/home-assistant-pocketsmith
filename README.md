@@ -98,7 +98,7 @@ custom_components/
 Add the following configuration to your `configuration.yaml` file:
 ```yaml
 pocketsmith:
-  developer_key: YOUR_DEVELOPER_KEY
+  developer_key: !secret pocketsmith_api
 
 sensor:
   - platform: pocketsmith
