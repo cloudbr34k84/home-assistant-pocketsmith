@@ -9,6 +9,50 @@ This sensor integration for Home Assistant fetches account balance information f
  - Supports multiple accounts linked to a single PocketSmith user.
  - Automatically updates the sensor state with the latest balance information.
  - Provides additional account details as sensor attributes.
+To create a developer API key in PocketSmith, follow these steps:
+
+### Step-by-Step Guide to Create a Developer API Key in PocketSmith
+
+1.  **Log In to PocketSmith**:
+    
+    *   Open your web browser and go to the [PocketSmith website](https://www.pocketsmith.com/).
+    *   Click on the "Login" button at the top right corner.
+    *   Enter your username and password, then click "Login."
+2.  **Navigate to Account Settings**:
+    
+    *   Once logged in, click on your profile picture or username at the top right corner.
+    *   Select "Account Settings" from the dropdown menu.
+3.  **Access the Developer API Section**:
+    
+    *   In the Account Settings menu, find and click on the "API" tab. This is usually listed under the "Security" or "Integrations" section.
+4.  **Generate a New API Key**:
+    
+    *   Click on the "Create a new API key" button.
+    *   A form will appear asking you to enter details for the new API key.
+5.  **Fill in the API Key Details**:
+    
+    *   Provide a name for your API key to help you remember its purpose.
+    *   Optionally, you can add a description for more context.
+    *   Set the permissions for the API key according to your needs. Permissions determine what actions can be performed with the key.
+6.  **Save the API Key**:
+    
+    *   After filling in the details, click on the "Create" or "Save" button.
+    *   Your new API key will be generated and displayed on the screen.
+7.  **Securely Store the API Key**:
+    
+    *   Copy the API key and store it securely. You will not be able to view the key again once you leave the page.
+    *   It's recommended to store the key in a secure password manager.
+8.  **Use the API Key**:
+    
+    *   You can now use this API key to authenticate your requests to the PocketSmith API. Include the key in the headers of your HTTP requests as specified in the PocketSmith API documentation.
+
+### Important Notes
+
+*   **Security**: Treat your API key like a password. Do not share it with anyone or expose it in public repositories or client-side code.
+*   **Permissions**: Carefully choose the permissions for your API key to minimize security risks. Only grant the necessary permissions required for your application.
+*   **Regenerate or Revoke**: If you suspect that your API key has been compromised, regenerate or revoke it immediately from the API section in your Account Settings.
+
+By following these steps, PocketSmith users can easily create and manage their developer API keys to integrate and automate their financial data.
 ## Detailed Comments Explanation
 ### Setup Platform (async_setup_platform):
  Initializes the PocketSmith platform by retrieving the developer key from Home Assistant's data. Fetches the user ID using the developer key. Retrieves user accounts using the user ID. Adds PocketSmithSensor entities for each user account.
