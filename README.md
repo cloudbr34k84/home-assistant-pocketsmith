@@ -1,21 +1,22 @@
 # PocketSmith Integration for Home Assistant
+![images](https://github.com/cloudbr34k84/home-assistant-pocketsmith/assets/58960644/1c0cf466-9dcf-4fcc-ad4a-6ed30da3bd95)
 
-## Overview
-The PocketSmith integration allows you to display account balances from PocketSmith in Home Assistant.
+# Overview
+This sensor integration for Home Assistant fetches account balance information from the PocketSmith API and presents it as sensors within Home Assistant.
 
-## Detailed Comments Explanation:
-
-**Setup Platform (async_setup_platform)**:
-Initializes the PocketSmith platform by retrieving the developer key from Home Assistant's data.
- - Fetches the user ID using the **developer key**.
+## Features
+ - Retrieves account balances from PocketSmith.
+ - Supports multiple accounts linked to a single PocketSmith user.
+ - Automatically updates the sensor state with the latest balance information.
+ - Provides additional account details as sensor attributes.
+## Detailed Comments Explanation
+### Setup Platform (async_setup_platform):
+ Initializes the PocketSmith platform by retrieving the developer key from Home Assistant's data. Fetches the user ID using the developer key. Retrieves user accounts using the user ID. Adds PocketSmithSensor entities for each user account.
+ - Fetches the user ID using the  **developer key**. 
  - Retrieves user accounts using the user ID.
-  - Adds **PocketSmithAccountSensor** entities for each user account.
-  - Adds **PocketSmithTransactionAccountSensor** entities for each transaction account associated with the user accounts.
-  - Adds **PocketSmithUncategorizedTransactionsSensor** to count the number of uncategorized transactions.
-  - Adds **PocketSmithTotalTransactionsSensor** to count the total number of transactions and their respective debit and credit counts.
-  - Adds **PocketSmithNetWorthSensor** to calculate and show the total net worth.
+ -  Adds  **PocketSmithSensor** entities for each user account.
 
-**PocketSmithAccountSensor Class**:
+### PocketSmithAccountSensor Class:
 Represents a sensor for a PocketSmith account.
 Initializes with the developer key, user ID, and account information.
 **Properties**:
@@ -26,49 +27,15 @@ Initializes with the developer key, user ID, and account information.
  - **device_class**: Returns the device class.
  - **extra_state_attributes**: Returns additional state attributes.
 
-**PocketSmithTransactionAccountSensor Class**:
-Represents a sensor for a PocketSmith transaction account.
-Initializes with the developer key, user ID, and transaction account information.
-**Properties**:
- - **unique_id**: Generates a unique ID for each sensor.
- - **name**: Returns the sensor's name.
- - **state**: Returns the current state of the sensor (transaction account balance).
- - **unit_of_measurement** Returns the unit of measurement for the sensor.
- - **device_class** Returns the device class.
- - **extra_state_attributes** Returns additional state attributes.
+### Fetching Data (`fetch_data`):
+Fetches the current balance and other details from the PocketSmith API.
+**Function**:
+ - fetch_data: Retrieves the current balance from the PocketSmith API.
  
-**PocketSmithUncategorizedTransactionsSensor Class**:
-Represents a sensor to count uncategorized transactions.
-Initializes with the developer key and user ID.
-**Properties**:
-  - **unique_id** Generates a unique ID for each sensor.
-  - **name**: Returns the sensor's name.
-  - **state** Returns the current state of the sensor (number of uncategorized transactions).
-  - **extra_state_attributes** Returns additional state attributes.
-
-**PocketSmithTotalTransactionsSensor Class**:
-Represents a sensor to count total transactions and their respective debit and credit counts.
-Initializes with the developer key and user ID.
-**Properties**:
- - **unique_id** Generates a unique ID for each sensor.
- - **name**: Returns the sensor's name.
- - **state** Returns the current state of the sensor (total number of transactions).
- - **extra_state_attributes** Returns additional state attributes (total count of debit and credit transactions).
-
-**PocketSmithNetWorthSensor Class**:
-Represents a sensor to calculate and show the total net worth.
-Initializes with the developer key and user ID.
-**Properties**:
- - **unique_id** Generates a unique ID for each sensor.
- - **name**: Returns the sensor's name.
- - **state** Returns the current state of the sensor (total net worth).
- - **unit_of_measurement** Returns the unit of measurement for the sensor.
- - **device_class** Returns the device class.
-
-**Helper Functions**:
+### Helper Functions:
+Additional utility functions to retrieve user ID and account information from the PocketSmith API.
  - **get_user_id**: Retrieves the user ID using the developer key.
  - **get_user_accounts**: Retrieves the user's accounts using the user ID.
- - **get_transaction_accounts**: Retrieves the transaction accounts for a specific account.
 
 ## Prerequisites
  - A running Home Assistant instance.
@@ -107,7 +74,7 @@ sensor:
 Restart Home Assistant to apply the changes.
 
 ## Automation Examples
-**Notify on Low Balance**:
+### Notify on Low Balance:
 Send a notification if an account balance falls below a certain threshold.
 ```
 alias: Notify on Low Balance
@@ -121,7 +88,7 @@ action:
       title: "Low Balance Alert"
       message: "Your PocketSmith account balance is below $100."
 ```
-**Log Balances Daily**:
+### Log Balances Daily:
 Log the account balances to a file or Google Sheets daily.
 ```
 alias: Log PocketSmith Balances
@@ -133,7 +100,7 @@ action:
     data_template:
       balance: "{{ states('sensor.pocketsmith_account_123_balance') }}"
 ```
-**Monthly Balance Summary**:
+### Monthly Balance Summary:
 Send a summary of your account balances at the end of each month.
 ```
 alias: Monthly Balance Summary
@@ -151,7 +118,7 @@ action:
         - Account 123: {{ states('sensor.pocketsmith_account_123_balance') }}
         - Account 456: {{ states('sensor.pocketsmith_account_456_balance') }}
 ```
-**Balance Change Alert**:
+### Balance Change Alert:
 Notify if there's a significant change in balance.
 ```
 alias: Balance Change Alert
