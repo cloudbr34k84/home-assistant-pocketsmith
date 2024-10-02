@@ -1,89 +1,78 @@
+
+---
+
 # PocketSmith Integration for Home Assistant
 ![images](https://github.com/cloudbr34k84/home-assistant-pocketsmith/assets/58960644/1c0cf466-9dcf-4fcc-ad4a-6ed30da3bd95)
 
 # Overview
-This sensor integration for Home Assistant fetches account balance information from the PocketSmith API and presents it as sensors within Home Assistant.
+This integration for Home Assistant fetches account balance information from the PocketSmith API and presents it as sensors within Home Assistant. Now includes the ability to monitor uncategorized transactions, providing a more comprehensive view of your financial data.
 
 ## Features
- - Retrieves account balances from PocketSmith.
- - Supports multiple accounts linked to a single PocketSmith user.
- - Automatically updates the sensor state with the latest balance information.
- - Provides additional account details as sensor attributes.
-To create a developer API key in PocketSmith, follow these steps:
+- **Account Balances:** Retrieves up-to-date account balances from PocketSmith and displays them as sensors in Home Assistant.
+- **Multiple Accounts Support:** Supports multiple accounts linked to a single PocketSmith user.
+- **Uncategorized Transactions Sensor:** Track the count of uncategorized transactions, helping you ensure all transactions are correctly categorized.
+- **Automatic Updates:** Automatically updates sensor states with the latest balance and transaction information at optimized intervals.
+- **Additional Attributes:** Provides detailed account and transaction information as sensor attributes, including filtered transaction details for better data management.
 
-### Step-by-Step Guide to Create a Developer API Key in PocketSmith
+### New Enhancements
+- **Custom Icons:** Sensors now include intuitive icons to help distinguish between balance and uncategorized transaction sensors.
+- **Throttled Updates:** Uses Home Assistant’s Debouncer to manage update frequencies efficiently, reducing unnecessary API calls.
 
-1.  **Log In to PocketSmith**:
-    
-    *   Open your web browser and go to the [PocketSmith website](https://www.pocketsmith.com/).
-    *   Click on the "Login" button at the top right corner.
-    *   Enter your username and password, then click "Login."
-2.  **Navigate to Account Settings**:
-    
-    *   Once logged in, click on your profile picture or username at the top right corner.
-    *   Select "Account Settings" from the dropdown menu.
-3.  **Access the Developer API Section**:
-    
-    *   In the Account Settings menu, find and click on the "API" tab. This is usually listed under the "Security" or "Integrations" section.
-4.  **Generate a New API Key**:
-    
-    *   Click on the "Create a new API key" button.
-    *   A form will appear asking you to enter details for the new API key.
-5.  **Fill in the API Key Details**:
-    
-    *   Provide a name for your API key to help you remember its purpose.
-    *   Optionally, you can add a description for more context.
-    *   Set the permissions for the API key according to your needs. Permissions determine what actions can be performed with the key.
-6.  **Save the API Key**:
-    
-    *   After filling in the details, click on the "Create" or "Save" button.
-    *   Your new API key will be generated and displayed on the screen.
-7.  **Securely Store the API Key**:
-    
-    *   Copy the API key and store it securely. You will not be able to view the key again once you leave the page.
-    *   It's recommended to store the key in a secure password manager.
-8.  **Use the API Key**:
-    
-    *   You can now use this API key to authenticate your requests to the PocketSmith API. Include the key in the headers of your HTTP requests as specified in the PocketSmith API documentation.
+## Step-by-Step Guide to Create a Developer API Key in PocketSmith
 
-### Important Notes
+1. **Log In to PocketSmith**:
+    - Open your web browser and go to the [PocketSmith website](https://www.pocketsmith.com/).
+    - Click on the "Login" button at the top right corner.
+    - Enter your username and password, then click "Login."
+2. **Navigate to Account Settings**:
+    - Click on your profile picture or username at the top right corner.
+    - Select "Account Settings" from the dropdown menu.
+3. **Access the Developer API Section**:
+    - Click on the "API" tab in Account Settings.
+4. **Generate a New API Key**:
+    - Click "Create a new API key."
+    - Provide a name, description, and set permissions.
+5. **Save and Secure Your API Key**:
+    - Copy and store the key securely (e.g., a password manager).
+    - Use this API key for authentication in the PocketSmith integration.
 
-*   **Security**: Treat your API key like a password. Do not share it with anyone or expose it in public repositories or client-side code.
-*   **Permissions**: Carefully choose the permissions for your API key to minimize security risks. Only grant the necessary permissions required for your application.
-*   **Regenerate or Revoke**: If you suspect that your API key has been compromised, regenerate or revoke it immediately from the API section in your Account Settings.
+## Integration Details
 
-By following these steps, PocketSmith users can easily create and manage their developer API keys to integrate and automate their financial data.
-## Detailed Comments Explanation
-### Setup Platform (async_setup_platform):
- Initializes the PocketSmith platform by retrieving the developer key from Home Assistant's data. Fetches the user ID using the developer key. Retrieves user accounts using the user ID. Adds PocketSmithSensor entities for each user account.
- - Fetches the user ID using the  **developer key**. 
- - Retrieves user accounts using the user ID.
- -  Adds  **PocketSmithSensor** entities for each user account.
+### Setup Platform (`async_setup_platform`):
+Initializes the PocketSmith platform by retrieving the developer key from Home Assistant's data and fetching user ID and account details. Now, it also creates a sensor for uncategorized transactions.
 
-### PocketSmithAccountSensor Class:
-Represents a sensor for a PocketSmith account.
-Initializes with the developer key, user ID, and account information.
+### `PocketSmithSensor` Class:
+Represents a sensor for a PocketSmith account balance.
+
 **Properties**:
- - **unique_id**: Generates a unique ID for each sensor.
- - **name**: Returns the sensor's name.
- - **state**: Returns the current state of the sensor (account balance).
- - **unit_of_measurement**: Returns the unit of measurement for the sensor.
- - **device_class**: Returns the device class.
- - **extra_state_attributes**: Returns additional state attributes.
+- **unique_id**: Generates a unique ID using account ID and title.
+- **name**: Displays the sensor's name, including "Balance" for clarity.
+- **state**: Shows the current account balance.
+- **unit_of_measurement**: Displays the currency code.
+- **device_class**: Set to "monetary" to indicate it's a financial sensor.
+- **extra_state_attributes**: Returns filtered account details for more relevant information.
+- **icon**: Displays the `mdi:currency-usd` icon.
 
-### Fetching Data (`fetch_data`):
-Fetches the current balance and other details from the PocketSmith API.
-**Function**:
- - fetch_data: Retrieves the current balance from the PocketSmith API.
- 
+### `PocketsmithUncategorisedTransactions` Class:
+Provides a new sensor for counting uncategorized transactions linked to your PocketSmith account.
+
+**Properties**:
+- **unique_id**: Unique ID for the uncategorized transactions sensor.
+- **name**: Displays as "Pocketsmith Uncategorised Transactions."
+- **state**: Shows the count of uncategorized transactions.
+- **unit_of_measurement**: Uses "transactions."
+- **icon**: Uses the `mdi:alert-circle-outline` icon for visual distinction.
+
+### Data Fetching (`fetch_data`):
+Efficiently fetches account balance and transaction details from the PocketSmith API, using Home Assistant's `async_get_clientsession` for optimal performance.
+
 ### Helper Functions:
-Additional utility functions to retrieve user ID and account information from the PocketSmith API.
- - **get_user_id**: Retrieves the user ID using the developer key.
- - **get_user_accounts**: Retrieves the user's accounts using the user ID.
+- **get_user_id**: Retrieves the user ID using the developer key.
+- **get_user_accounts**: Fetches linked accounts using the user ID.
 
 ## Prerequisites
- - A running Home Assistant instance.
- - A PocketSmith developer key.
+- A running Home Assistant instance.
+- A PocketSmith developer key.
 
 ## Installation
 
@@ -96,12 +85,11 @@ Additional utility functions to retrieve user ID and account information from th
 3. **Directory Structure**:
 custom_components/
 └── pocketsmith/
-├── init.py
-├── manifest.json
-├── const.py
-└── sensor.py
+    ├── __init__.py
+    ├── manifest.json
+    ├── const.py
+    └── sensor.py
 ![LPHHgmmRQz8yXE1v3khgVT](https://github.com/cloudbr34k84/home-assistant-pocketsmith/assets/58960644/ab51d2a9-2c42-4244-8dd8-708f6ee02a36)
-
 
 ## Configuration
 
@@ -118,9 +106,10 @@ sensor:
 Restart Home Assistant to apply the changes.
 
 ## Automation Examples
+
 ### Notify on Low Balance:
 Send a notification if an account balance falls below a certain threshold.
-```
+```yaml
 alias: Notify on Low Balance
 trigger:
   - platform: numeric_state
@@ -132,9 +121,25 @@ action:
       title: "Low Balance Alert"
       message: "Your PocketSmith account balance is below $100."
 ```
-### Log Balances Daily:
-Log the account balances to a file or Google Sheets daily.
+
+### Notify on Uncategorised Transactions:
+Send a notification if uncategorized transactions exceed a certain number.
+```yaml
+alias: Notify on Uncategorised Transactions
+trigger:
+  - platform: numeric_state
+    entity_id: sensor.pocketsmith_uncategorised_transactions
+    above: 5
+action:
+  - service: notify.notify
+    data:
+      title: "Uncategorised Transactions Alert"
+      message: "You have more than 5 uncategorised transactions in PocketSmith."
 ```
+
+### Log Balances Daily:
+Log the account balances and uncategorized transactions count to a file or Google Sheets daily.
+```yaml
 alias: Log PocketSmith Balances
 trigger:
   - platform: time
@@ -143,11 +148,13 @@ action:
   - service: rest_command.log_balance
     data_template:
       balance: "{{ states('sensor.pocketsmith_account_123_balance') }}"
+      uncategorised: "{{ states('sensor.pocketsmith_uncategorised_transactions') }}"
 ```
-### Monthly Balance Summary:
-Send a summary of your account balances at the end of each month.
-```
-alias: Monthly Balance Summary
+
+### Monthly Summary:
+Send a summary of your account balances and uncategorized transactions at the end of each month.
+```yaml
+alias: Monthly PocketSmith Summary
 trigger:
   - platform: time
     at: "00:00:00"
@@ -156,42 +163,27 @@ trigger:
 action:
   - service: notify.notify
     data_template:
-      title: "Monthly Balance Summary"
+      title: "Monthly PocketSmith Summary"
       message: >
-        PocketSmith Account Balances:
+        Account Balances:
         - Account 123: {{ states('sensor.pocketsmith_account_123_balance') }}
-        - Account 456: {{ states('sensor.pocketsmith_account_456_balance') }}
+        Uncategorized Transactions: {{ states('sensor.pocketsmith_uncategorised_transactions') }}
 ```
-### Balance Change Alert:
-Notify if there's a significant change in balance.
-```
-alias: Balance Change Alert
-trigger:
-  - platform: state
-    entity_id: sensor.pocketsmith_account_123_balance
-condition:
-  - condition: template
-    value_template: "{{ (trigger.to_state.state | float) - (trigger.from_state.state | float) > 500 }}"
-action:
-  - service: notify.notify
-    data_template:
-      title: "Balance Change Alert"
-      message: "Your PocketSmith account balance has changed significantly: {{ trigger.to_state.state }}."
-```
-
-
 
 ## Usage
 
-Once configured, your PocketSmith accounts will appear as sensors in Home Assistant with the current balance and the appropriate unit of measurement.
+Once configured, your PocketSmith accounts will appear as sensors in Home Assistant with the current balance, uncategorized transaction count, and appropriate icons. You can use these sensors in your automations, dashboards, and notifications.
 
 ## Troubleshooting
-Duplicate Sensors: If duplicate sensors appear, ensure you have unique IDs and that the integration is not being reloaded multiple times.
-No Balance Displayed: Check Home Assistant logs for errors related to fetching balance and ensure the correct API keys are used.
-Contributions
+- **Duplicate Sensors:** Ensure unique IDs are set correctly to avoid duplicates.
+- **No Balance or Transaction Data:** Check Home Assistant logs for errors related to fetching data from PocketSmith and verify the API key configuration.
+
+## Contributions
 Feel free to contribute to this integration by submitting issues or pull requests to the GitHub repository.
 
 ## License
 This project is licensed under the MIT License.
 
+---
 
+This updated README provides clear, detailed, and easy-to-understand instructions that accurately reflect the current functionality of your PocketSmith integration.
