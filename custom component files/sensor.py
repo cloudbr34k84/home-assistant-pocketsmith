@@ -1,5 +1,6 @@
 import logging
 import aiohttp
+import async_timeout
 from homeassistant.components.sensor import SensorEntity  # Use SensorEntity for sensor-specific properties
 from homeassistant.helpers.aiohttp_client import async_get_clientsession  # Use Home Assistant's session manager
 from homeassistant.helpers.debounce import Debouncer  # Import Debouncer for throttling updates
@@ -94,7 +95,8 @@ class PocketSmithSensor(SensorEntity):
     async def async_update_data(self):
         """Fetch the latest data from the PocketSmith API."""
         try:
-            self._state = await self.fetch_data()
+            async with async_timeout.timeout(10):  # Adding a timeout for API requests
+                self._state = await self.fetch_data()
         except Exception as e:
             _LOGGER.error(f"Error updating PocketSmith sensor: {e}")
 
@@ -190,7 +192,8 @@ class PocketsmithUncategorisedTransactions(SensorEntity):
     async def async_update_data(self):
         """Fetch uncategorised transactions count from the PocketSmith API."""
         try:
-            self._state = await self.fetch_uncategorised_transactions_count()
+            async with async_timeout.timeout(10):  # Adding a timeout for API requests
+                self._state = await self.fetch_uncategorised_transactions_count()
         except Exception as e:
             _LOGGER.error(f"Error updating Pocketsmith uncategorised transactions sensor: {e}")
 
@@ -222,13 +225,14 @@ async def get_user_id(hass, developer_key):
     }
     
     session = async_get_clientsession(hass)
-    async with session.get(url, headers=headers) as response:
-        if response.status == 200:
-            data = await response.json()
-            return data.get("id")
-        else:
-            _LOGGER.error(f"Failed to retrieve user ID. Status code: {response.status}")
-            response.raise_for_status()
+    async with async_timeout.timeout(10):  # Adding a timeout for API requests
+        async with session.get(url, headers=headers) as response:
+            if response.status == 200:
+                data = await response.json()
+                return data.get("id")
+            else:
+                _LOGGER.error(f"Failed to retrieve user ID. Status code: {response.status}")
+                response.raise_for_status()
 
 async def get_user_accounts(hass, developer_key, user_id):
     """Retrieve the user's accounts using the user ID."""
@@ -239,10 +243,11 @@ async def get_user_accounts(hass, developer_key, user_id):
     }
     
     session = async_get_clientsession(hass)
-    async with session.get(url, headers=headers) as response:
-        if response.status == 200:
-            data = await response.json()
-            return data
-        else:
-            _LOGGER.error(f"Failed to retrieve user accounts. Status code: {response.status}")
-            response.raise_for_status()
+    async with async_timeout.timeout(10):  # Adding a timeout for API requests
+        async with session.get(url, headers=headers) as response:
+            if response.status == 200:
+                data = await response.json()
+                return data
+            else:
+                _LOGGER.error(f"Failed to retrieve user accounts. Status code: {response.status}")
+                response.raise_for_status()
