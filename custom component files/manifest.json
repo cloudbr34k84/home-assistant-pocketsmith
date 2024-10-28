@@ -1,7 +1,7 @@
 {
     "domain": "pocketsmith",
     "name": "PocketSmith",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "documentation": "https://github.com/cloudbr34k84/home-assistant-pocketsmith",
     "requirements": ["aiohttp", "async-timeout"],
     "dependencies": [],
