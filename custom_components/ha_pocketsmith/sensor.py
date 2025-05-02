@@ -1,5 +1,6 @@
 import logging
 import aiohttp
+import asyncio
 import async_timeout
 from homeassistant.components.sensor import SensorEntity  # Use SensorEntity for sensor-specific properties
 from homeassistant.helpers.aiohttp_client import async_get_clientsession  # Use Home Assistant's session manager
@@ -24,8 +25,14 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         sensors.append(PocketsmithUncategorisedTransactions(hass, developer_key, user_id))
         
         async_add_entities(sensors)
+    except aiohttp.ClientError as client_err:
+        _LOGGER.error(f"Network error connecting to PocketSmith API: {client_err}")
+    except asyncio.TimeoutError:
+        _LOGGER.error("Timeout error connecting to PocketSmith API")
+    except KeyError as key_err:
+        _LOGGER.error(f"Required configuration value missing: {key_err}")
     except Exception as e:
-        _LOGGER.error(f"Error setting up PocketSmith platform: {e}")
+        _LOGGER.error(f"Unexpected error setting up PocketSmith platform: {e}")
 
 class PocketSmithSensor(SensorEntity):
     """Representation of a PocketSmith Account Balance Sensor."""
@@ -97,8 +104,12 @@ class PocketSmithSensor(SensorEntity):
         try:
             async with async_timeout.timeout(10):  # Adding a timeout for API requests
                 self._state = await self.fetch_data()
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout while connecting to PocketSmith API")
+        except aiohttp.ClientError as client_err:
+            _LOGGER.error(f"Network error connecting to PocketSmith API: {client_err}")
         except Exception as e:
-            _LOGGER.error(f"Error updating PocketSmith sensor: {e}")
+            _LOGGER.error(f"Unexpected error updating PocketSmith sensor: {e}")
 
     async def fetch_data(self):
         """Fetch account balance data from PocketSmith API."""
@@ -109,33 +120,46 @@ class PocketSmithSensor(SensorEntity):
         url = f"https://api.pocketsmith.com/v2/accounts/{self._account['id']}"
 
         session = async_get_clientsession(self._hass)
-        async with session.get(url, headers=headers) as response:
-            if response.status == 200:
-                data = await response.json()
-                _LOGGER.debug(f"Fetched data for account {self._account['id']}: {data}")
-                
-                # Set the balance as the state
-                balance = data.get("current_balance", 0.0)  # Default to 0.0 if missing
+        try:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    _LOGGER.debug(f"Fetched data for account {self._account['id']}: {data}")
+                    
+                    # Set the balance as the state
+                    balance = data.get("current_balance", 0.0)  # Default to 0.0 if missing
 
-                # Extract only the necessary fields
-                transaction_accounts = data.get("transaction_accounts", [])
-                filtered_accounts = []
-                for account in transaction_accounts:
-                    filtered_account = {
-                        "id": account.get("id"),
-                        "account_id": account.get("account_id"),
-                        "name": account.get("name"),
-                        "current_balance": account.get("current_balance")
-                    }
-                    filtered_accounts.append(filtered_account)
+                    # Extract only the necessary fields
+                    transaction_accounts = data.get("transaction_accounts", [])
+                    filtered_accounts = []
+                    for account in transaction_accounts:
+                        filtered_account = {
+                            "id": account.get("id"),
+                            "account_id": account.get("account_id"),
+                            "name": account.get("name"),
+                            "current_balance": account.get("current_balance")
+                        }
+                        filtered_accounts.append(filtered_account)
 
-                # Set only the filtered attributes
-                self._attributes = {"transaction_accounts": filtered_accounts}
-                
-                return balance
-            else:
-                _LOGGER.error(f"Failed to fetch data for account {self._account['id']}. Status code: {response.status}")
-                return None
+                    # Set only the filtered attributes
+                    self._attributes = {"transaction_accounts": filtered_accounts}
+                    
+                    return balance
+                elif response.status == 401:
+                    _LOGGER.error("Authentication failed: Invalid developer key")
+                    return None
+                elif response.status == 404:
+                    _LOGGER.error(f"Account {self._account['id']} not found")
+                    return None
+                else:
+                    _LOGGER.error(f"Failed to fetch data for account {self._account['id']}. Status code: {response.status}")
+                    return None
+        except aiohttp.ClientResponseError as resp_err:
+            _LOGGER.error(f"Response error for account {self._account['id']}: {resp_err}")
+            return None
+        except aiohttp.ContentTypeError as ct_err:
+            _LOGGER.error(f"Invalid content type received for account {self._account['id']}: {ct_err}")
+            return None
 
 class PocketsmithUncategorisedTransactions(SensorEntity):
     """Representation of a PocketSmith Sensor for counting uncategorised transactions."""
@@ -194,8 +218,12 @@ class PocketsmithUncategorisedTransactions(SensorEntity):
         try:
             async with async_timeout.timeout(10):  # Adding a timeout for API requests
                 self._state = await self.fetch_uncategorised_transactions_count()
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout while connecting to PocketSmith API")
+        except aiohttp.ClientError as client_err:
+            _LOGGER.error(f"Network error connecting to PocketSmith API: {client_err}")
         except Exception as e:
-            _LOGGER.error(f"Error updating Pocketsmith uncategorised transactions sensor: {e}")
+            _LOGGER.error(f"Unexpected error updating Pocketsmith uncategorised transactions sensor: {e}")
 
     async def fetch_uncategorised_transactions_count(self):
         """Fetch transactions and count those with a null category."""
@@ -206,15 +234,28 @@ class PocketsmithUncategorisedTransactions(SensorEntity):
         url = f"https://api.pocketsmith.com/v2/users/{self._user_id}/transactions"
 
         session = async_get_clientsession(self._hass)
-        async with session.get(url, headers=headers) as response:
-            if response.status == 200:
-                transactions = await response.json()
-                null_category_count = sum(1 for transaction in transactions if transaction.get("category") is None)
-                _LOGGER.debug(f"Number of uncategorised transactions: {null_category_count}")
-                return null_category_count
-            else:
-                _LOGGER.error(f"Failed to fetch transactions for user {self._user_id}. Status code: {response.status}")
-                return None
+        try:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    transactions = await response.json()
+                    null_category_count = sum(1 for transaction in transactions if transaction.get("category") is None)
+                    _LOGGER.debug(f"Number of uncategorised transactions: {null_category_count}")
+                    return null_category_count
+                elif response.status == 401:
+                    _LOGGER.error("Authentication failed: Invalid developer key")
+                    return None
+                elif response.status == 404:
+                    _LOGGER.error(f"User {self._user_id} not found")
+                    return None
+                else:
+                    _LOGGER.error(f"Failed to fetch transactions for user {self._user_id}. Status code: {response.status}")
+                    return None
+        except aiohttp.ClientResponseError as resp_err:
+            _LOGGER.error(f"Response error for user {self._user_id}: {resp_err}")
+            return None
+        except aiohttp.ContentTypeError as ct_err:
+            _LOGGER.error(f"Invalid content type received for user {self._user_id}: {ct_err}")
+            return None
 
 async def get_user_id(hass, developer_key):
     """Retrieve the user ID using the developer key."""
@@ -225,14 +266,32 @@ async def get_user_id(hass, developer_key):
     }
     
     session = async_get_clientsession(hass)
-    async with async_timeout.timeout(10):  # Adding a timeout for API requests
-        async with session.get(url, headers=headers) as response:
-            if response.status == 200:
-                data = await response.json()
-                return data.get("id")
-            else:
-                _LOGGER.error(f"Failed to retrieve user ID. Status code: {response.status}")
-                response.raise_for_status()
+    try:
+        async with async_timeout.timeout(10):  # Adding a timeout for API requests
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get("id")
+                elif response.status == 401:
+                    _LOGGER.error("Authentication failed: Invalid developer key")
+                    raise aiohttp.ClientResponseError(
+                        request_info=response.request_info,
+                        history=response.history,
+                        status=response.status,
+                        message="Authentication failed: Invalid developer key"
+                    )
+                else:
+                    _LOGGER.error(f"Failed to retrieve user ID. Status code: {response.status}")
+                    response.raise_for_status()
+    except aiohttp.ClientResponseError as resp_err:
+        _LOGGER.error(f"Response error when retrieving user ID: {resp_err}")
+        raise
+    except aiohttp.ContentTypeError as ct_err:
+        _LOGGER.error(f"Invalid content type received when retrieving user ID: {ct_err}")
+        raise
+    except asyncio.TimeoutError:
+        _LOGGER.error("Timeout when retrieving user ID")
+        raise
 
 async def get_user_accounts(hass, developer_key, user_id):
     """Retrieve the user's accounts using the user ID."""
@@ -243,11 +302,37 @@ async def get_user_accounts(hass, developer_key, user_id):
     }
     
     session = async_get_clientsession(hass)
-    async with async_timeout.timeout(10):  # Adding a timeout for API requests
-        async with session.get(url, headers=headers) as response:
-            if response.status == 200:
-                data = await response.json()
-                return data
-            else:
-                _LOGGER.error(f"Failed to retrieve user accounts. Status code: {response.status}")
-                response.raise_for_status()
+    try:
+        async with async_timeout.timeout(10):  # Adding a timeout for API requests
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data
+                elif response.status == 401:
+                    _LOGGER.error("Authentication failed: Invalid developer key")
+                    raise aiohttp.ClientResponseError(
+                        request_info=response.request_info,
+                        history=response.history,
+                        status=response.status,
+                        message="Authentication failed: Invalid developer key"
+                    )
+                elif response.status == 404:
+                    _LOGGER.error(f"User {user_id} not found")
+                    raise aiohttp.ClientResponseError(
+                        request_info=response.request_info,
+                        history=response.history,
+                        status=response.status,
+                        message=f"User {user_id} not found"
+                    )
+                else:
+                    _LOGGER.error(f"Failed to retrieve user accounts. Status code: {response.status}")
+                    response.raise_for_status()
+    except aiohttp.ClientResponseError as resp_err:
+        _LOGGER.error(f"Response error when retrieving user accounts: {resp_err}")
+        raise
+    except aiohttp.ContentTypeError as ct_err:
+        _LOGGER.error(f"Invalid content type received when retrieving user accounts: {ct_err}")
+        raise
+    except asyncio.TimeoutError:
+        _LOGGER.error("Timeout when retrieving user accounts")
+        raise
