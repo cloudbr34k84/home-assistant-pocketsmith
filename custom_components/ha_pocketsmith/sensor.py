@@ -2,12 +2,20 @@ import logging
 import aiohttp
 import asyncio
 import async_timeout
-from homeassistant.components.sensor import SensorEntity  # Use SensorEntity for sensor-specific properties
+from homeassistant.components.sensor import SensorEntity, SensorEntityDescription  # Add SensorEntityDescription
 from homeassistant.helpers.aiohttp_client import async_get_clientsession  # Use Home Assistant's session manager
 from homeassistant.helpers.debounce import Debouncer  # Import Debouncer for throttling updates
 from .const import DOMAIN  # Import domain constant
 
 _LOGGER = logging.getLogger(__name__)
+
+# Define the sensor entity description for account balance
+ACCOUNT_BALANCE_DESCRIPTION = SensorEntityDescription(
+    key="balance",
+    name="Account Balance",
+    icon="mdi:currency-usd",
+    device_class="monetary",
+)
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up PocketSmith sensors (existing and new)."""
@@ -19,7 +27,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         user_accounts = await get_user_accounts(hass, developer_key, user_id)
         
         # Create PocketSmith sensors for each account
-        sensors = [PocketSmithSensor(hass, developer_key, account) for account in user_accounts]
+        sensors = [PocketSmithSensor(hass, developer_key, account, ACCOUNT_BALANCE_DESCRIPTION) for account in user_accounts]
         
         # Add a sensor for uncategorised transactions
         sensors.append(PocketsmithUncategorisedTransactions(hass, developer_key, user_id))
@@ -37,7 +45,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 class PocketSmithSensor(SensorEntity):
     """Representation of a PocketSmith Account Balance Sensor."""
 
-    def __init__(self, hass, developer_key, account):
+    def __init__(self, hass, developer_key, account, description: SensorEntityDescription):
         """Initialize the sensor."""
         self._hass = hass
         self._developer_key = developer_key
@@ -45,6 +53,7 @@ class PocketSmithSensor(SensorEntity):
         self._state = None
         self._attributes = {}
         self._debouncer = None  # For managing throttling updates
+        self.entity_description = description
 
     @property
     def unique_id(self):
@@ -56,7 +65,8 @@ class PocketSmithSensor(SensorEntity):
     @property
     def name(self):
         """Return the name of the sensor."""
-        return f"PocketSmith Account {self._account.get('title', 'Unnamed Account')} Balance"
+        account_title = self._account.get('title', 'Unnamed Account')
+        return f"PocketSmith Account {account_title} {self.entity_description.name}"
 
     @property
     def state(self):
@@ -71,12 +81,12 @@ class PocketSmithSensor(SensorEntity):
     @property
     def device_class(self):
         """Return the device class for this sensor."""
-        return "monetary"
+        return self.entity_description.device_class
 
     @property
     def icon(self):
         """Return an icon representing the sensor."""
-        return "mdi:currency-usd"
+        return self.entity_description.icon
 
     @property
     def extra_state_attributes(self):
