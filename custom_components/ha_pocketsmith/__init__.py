@@ -1,27 +1,16 @@
 """PocketSmith Integration."""
 import logging
 from datetime import timedelta
-
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
-
+from homeassistant.helpers import config_validation as cv
 from .const import DOMAIN
 from .coordinator import PocketSmithCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-
 _UPDATE_INTERVAL = timedelta(minutes=5)
 
-
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """YAML configuration is no longer supported."""
-    if DOMAIN in config:
-        _LOGGER.warning(
-            "PocketSmith YAML configuration is no longer supported. "
-            "Please migrate to a config entry via Settings \u2192 Integrations."
-        )
-    return True
-
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up PocketSmith from a config entry."""
@@ -30,15 +19,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         developer_key=entry.data["developer_key"],
         update_interval=_UPDATE_INTERVAL,
     )
-
     await coordinator.async_config_entry_first_refresh()
-
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
-
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
     return True
-
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Handle unloading of an entry."""
