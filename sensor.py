@@ -241,25 +241,34 @@ class PocketsmithUncategorisedTransactions(SensorEntity):
             "Accept": "application/json",
             "Authorization": f"Key {self._developer_key}"
         }
-        url = f"https://api.pocketsmith.com/v2/users/{self._user_id}/transactions"
+        base_url = f"https://api.pocketsmith.com/v2/users/{self._user_id}/transactions"
 
         session = async_get_clientsession(self._hass)
+        null_category_count = 0
+        page = 1
+
         try:
-            async with session.get(url, headers=headers) as response:
-                if response.status == 200:
-                    transactions = await response.json()
-                    null_category_count = sum(1 for transaction in transactions if transaction.get("category") is None)
-                    _LOGGER.debug(f"Number of uncategorised transactions: {null_category_count}")
-                    return null_category_count
-                elif response.status == 401:
-                    _LOGGER.error("Authentication failed: Invalid developer key")
-                    return None
-                elif response.status == 404:
-                    _LOGGER.error(f"User {self._user_id} not found")
-                    return None
-                else:
-                    _LOGGER.error(f"Failed to fetch transactions for user {self._user_id}. Status code: {response.status}")
-                    return None
+            while True:
+                url = f"{base_url}?page={page}"
+                async with session.get(url, headers=headers) as response:
+                    if response.status == 200:
+                        transactions = await response.json()
+                        if not transactions:
+                            break
+                        null_category_count += sum(1 for t in transactions if t.get("category") is None)
+                        page += 1
+                    elif response.status == 401:
+                        _LOGGER.error("Authentication failed: Invalid developer key")
+                        return None
+                    elif response.status == 404:
+                        _LOGGER.error(f"User {self._user_id} not found")
+                        return None
+                    else:
+                        _LOGGER.error(f"Failed to fetch transactions for user {self._user_id}. Status code: {response.status}")
+                        return None
+
+            _LOGGER.debug(f"Number of uncategorised transactions: {null_category_count}")
+            return null_category_count
         except aiohttp.ClientResponseError as resp_err:
             _LOGGER.error(f"Response error for user {self._user_id}: {resp_err}")
             return None
@@ -281,7 +290,11 @@ async def get_user_id(hass, developer_key):
             async with session.get(url, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
-                    return data.get("id")
+                    user_id = data.get("id")
+                    if user_id is None:
+                        _LOGGER.error("PocketSmith API returned no user ID in response")
+                        raise ValueError("PocketSmith API response missing 'id' field")
+                    return user_id
                 elif response.status == 401:
                     _LOGGER.error("Authentication failed: Invalid developer key")
                     raise aiohttp.ClientResponseError(

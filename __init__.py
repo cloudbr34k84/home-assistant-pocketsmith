@@ -1,4 +1,5 @@
 """PocketSmith Integration."""
+import asyncio
 import logging
 import aiohttp
 import async_timeout
@@ -22,11 +23,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up PocketSmith from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
-    session = aiohttp.ClientSession()  # Create a reusable session for HTTP requests
     developer_key = entry.data.get("developer_key")
     hass.data[DOMAIN] = {
         "developer_key": developer_key,
-        "session": session,
     }
 
     try:
@@ -42,16 +41,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return False
 
     # Load platforms related to the integration (like sensors)
-    hass.async_create_task(
-        discovery.async_load_platform(hass, "sensor", DOMAIN, {}, entry)
-    )
+    await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Handle unloading of an entry."""
-    if DOMAIN in hass.data:
-        session = hass.data[DOMAIN].get("session")
-        if session:
-            await session.close()  # Properly close the aiohttp session
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, ["sensor"])
+    if unload_ok and DOMAIN in hass.data:
         hass.data.pop(DOMAIN)
-    return True
+    return unload_ok
