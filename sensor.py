@@ -39,6 +39,8 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         _LOGGER.error("Timeout error connecting to PocketSmith API")
     except KeyError as key_err:
         _LOGGER.error(f"Required configuration value missing: {key_err}")
+    except ValueError as val_err:
+        _LOGGER.error(f"Invalid data received from PocketSmith API: {val_err}")
     except Exception as e:
         _LOGGER.error(f"Unexpected error setting up PocketSmith platform: {e}")
 
@@ -226,17 +228,16 @@ class PocketsmithUncategorisedTransactions(SensorEntity):
     async def async_update_data(self):
         """Fetch uncategorised transactions count from the PocketSmith API."""
         try:
-            async with async_timeout.timeout(10):  # Adding a timeout for API requests
-                self._state = await self.fetch_uncategorised_transactions_count()
-        except asyncio.TimeoutError:
-            _LOGGER.error("Timeout while connecting to PocketSmith API")
+            self._state = await self.fetch_uncategorised_transactions_count()
         except aiohttp.ClientError as client_err:
             _LOGGER.error(f"Network error connecting to PocketSmith API: {client_err}")
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout while connecting to PocketSmith API")
         except Exception as e:
             _LOGGER.error(f"Unexpected error updating Pocketsmith uncategorised transactions sensor: {e}")
 
     async def fetch_uncategorised_transactions_count(self):
-        """Fetch transactions and count those with a null category."""
+        """Fetch all transaction pages and count those with a null category."""
         headers = {
             "Accept": "application/json",
             "Authorization": f"Key {self._developer_key}"
@@ -247,34 +248,35 @@ class PocketsmithUncategorisedTransactions(SensorEntity):
         null_category_count = 0
         page = 1
 
-        try:
-            while True:
-                url = f"{base_url}?page={page}"
-                async with session.get(url, headers=headers) as response:
-                    if response.status == 200:
-                        transactions = await response.json()
-                        if not transactions:
-                            break
-                        null_category_count += sum(1 for t in transactions if t.get("category") is None)
-                        page += 1
-                    elif response.status == 401:
-                        _LOGGER.error("Authentication failed: Invalid developer key")
-                        return None
-                    elif response.status == 404:
-                        _LOGGER.error(f"User {self._user_id} not found")
-                        return None
-                    else:
-                        _LOGGER.error(f"Failed to fetch transactions for user {self._user_id}. Status code: {response.status}")
-                        return None
+        while True:
+            url = f"{base_url}?page={page}"
+            try:
+                async with async_timeout.timeout(10):
+                    async with session.get(url, headers=headers) as response:
+                        if response.status == 200:
+                            transactions = await response.json()
+                            if not transactions:
+                                break
+                            null_category_count += sum(1 for t in transactions if t.get("category") is None)
+                            page += 1
+                        elif response.status == 401:
+                            _LOGGER.error("Authentication failed: Invalid developer key")
+                            return None
+                        elif response.status == 404:
+                            _LOGGER.error(f"User {self._user_id} not found")
+                            return None
+                        else:
+                            _LOGGER.error(f"Failed to fetch transactions page {page} for user {self._user_id}. Status code: {response.status}")
+                            return None
+            except aiohttp.ClientResponseError as resp_err:
+                _LOGGER.error(f"Response error on page {page} for user {self._user_id}: {resp_err}")
+                return None
+            except aiohttp.ContentTypeError as ct_err:
+                _LOGGER.error(f"Invalid content type on page {page} for user {self._user_id}: {ct_err}")
+                return None
 
-            _LOGGER.debug(f"Number of uncategorised transactions: {null_category_count}")
-            return null_category_count
-        except aiohttp.ClientResponseError as resp_err:
-            _LOGGER.error(f"Response error for user {self._user_id}: {resp_err}")
-            return None
-        except aiohttp.ContentTypeError as ct_err:
-            _LOGGER.error(f"Invalid content type received for user {self._user_id}: {ct_err}")
-            return None
+        _LOGGER.debug(f"Number of uncategorised transactions: {null_category_count}")
+        return null_category_count
 
 async def get_user_id(hass, developer_key):
     """Retrieve the user ID using the developer key."""
