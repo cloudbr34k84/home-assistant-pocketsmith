@@ -1,7 +1,7 @@
 ---
 
 # PocketSmith Integration for Home Assistant
-![PocketSmith Home Assistant Integration](https://raw.githubusercontent.com/cloudbr34k84/home-assistant-pocketsmith/main/logo.png)
+![PocketSmith Home Assistant Integration](https://raw.githubusercontent.com/cloudbr34k84/home-assistant-pocketsmith/main/brand/icon.png)
 
 # Overview
 This integration for Home Assistant fetches account balance information from the PocketSmith API and presents it as sensors within Home Assistant. Includes the ability to monitor uncategorized transactions, providing a more comprehensive view of your financial data.
