@@ -41,7 +41,13 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             accounts = await self._fetch_accounts(session, user_id)
             uncategorised_count = await self._fetch_uncategorised_count(session, user_id)
         except aiohttp.ClientError as err:
-            raise UpdateFailed("Network error communicating with PocketSmith API: %s" % err) from err
+            raise UpdateFailed(
+                "Unable to reach the PocketSmith API. Check your network connection."
+            ) from err
+        except asyncio.TimeoutError as err:
+            raise UpdateFailed(
+                "PocketSmith API request timed out. Check your network connection."
+            ) from err
 
         return {
             "user_id": user_id,
@@ -56,13 +62,33 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         async with asyncio.timeout(_REQUEST_TIMEOUT):
             async with session.get(url, headers=self._headers) as response:
                 if response.status == 401:
-                    raise UpdateFailed("Authentication failed: invalid developer key")
+                    raise UpdateFailed(
+                        "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
+                        "Reconfigure the integration to fix this."
+                    )
+                if response.status == 403:
+                    raise UpdateFailed(
+                        "PocketSmith access denied — your developer key lacks the required permissions "
+                        "to read your account data."
+                    )
+                if response.status == 429:
+                    raise UpdateFailed(
+                        "PocketSmith API rate limit exceeded. The integration will retry on the next update."
+                    )
+                if response.status >= 500:
+                    raise UpdateFailed(
+                        "PocketSmith is experiencing server issues (HTTP %s). "
+                        "Data will refresh when the service recovers." % response.status
+                    )
                 response.raise_for_status()
                 data = await response.json()
 
         user_id = data.get("id")
         if user_id is None:
-            raise UpdateFailed("PocketSmith API returned a user response with no 'id' field")
+            raise UpdateFailed(
+                "Received an unexpected response from PocketSmith — the user profile was missing a required field. "
+                "This may be a temporary API issue."
+            )
 
         _LOGGER.debug("Fetched user ID: %s", user_id)
         return user_id
@@ -74,9 +100,28 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         async with asyncio.timeout(_REQUEST_TIMEOUT):
             async with session.get(url, headers=self._headers) as response:
                 if response.status == 401:
-                    raise UpdateFailed("Authentication failed: invalid developer key")
+                    raise UpdateFailed(
+                        "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
+                        "Reconfigure the integration to fix this."
+                    )
+                if response.status == 403:
+                    raise UpdateFailed(
+                        "PocketSmith access denied — your developer key lacks the required permissions "
+                        "to read your accounts."
+                    )
                 if response.status == 404:
-                    raise UpdateFailed("User %s not found" % user_id)
+                    raise UpdateFailed(
+                        "PocketSmith could not find your account data. This may be a temporary API issue."
+                    )
+                if response.status == 429:
+                    raise UpdateFailed(
+                        "PocketSmith API rate limit exceeded. The integration will retry on the next update."
+                    )
+                if response.status >= 500:
+                    raise UpdateFailed(
+                        "PocketSmith is experiencing server issues (HTTP %s). "
+                        "Data will refresh when the service recovers." % response.status
+                    )
                 response.raise_for_status()
                 accounts = await response.json()
 
@@ -95,9 +140,28 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             async with asyncio.timeout(_REQUEST_TIMEOUT):
                 async with session.get(url, headers=self._headers) as response:
                     if response.status == 401:
-                        raise UpdateFailed("Authentication failed: invalid developer key")
+                        raise UpdateFailed(
+                            "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
+                            "Reconfigure the integration to fix this."
+                        )
+                    if response.status == 403:
+                        raise UpdateFailed(
+                            "PocketSmith access denied — your developer key lacks the required permissions "
+                            "to read your transactions."
+                        )
                     if response.status == 404:
-                        raise UpdateFailed("User %s not found" % user_id)
+                        raise UpdateFailed(
+                            "PocketSmith could not find your transaction data. This may be a temporary API issue."
+                        )
+                    if response.status == 429:
+                        raise UpdateFailed(
+                            "PocketSmith API rate limit exceeded. The integration will retry on the next update."
+                        )
+                    if response.status >= 500:
+                        raise UpdateFailed(
+                            "PocketSmith is experiencing server issues (HTTP %s). "
+                            "Data will refresh when the service recovers." % response.status
+                        )
                     response.raise_for_status()
                     transactions = await response.json()
 

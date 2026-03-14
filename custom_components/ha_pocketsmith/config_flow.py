@@ -25,6 +25,8 @@ async def _validate_developer_key(hass, developer_key: str) -> None:
         async with session.get(_API_ME, headers=headers) as response:
             if response.status == 401:
                 raise ValueError("invalid_auth")
+            if response.status == 403:
+                raise ValueError("insufficient_permissions")
             response.raise_for_status()
 
 
