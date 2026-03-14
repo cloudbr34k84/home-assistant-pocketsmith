@@ -157,17 +157,27 @@ class PocketSmithCategoriesSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Categories"
+        return "PocketSmith Total Spent"
 
     @property
     def native_value(self):
-        """Return the count of categories."""
-        return len(self.coordinator.data.get("categories", []))
+        """Return total actual spend from the budget summary expense or income analysis."""
+        raw = self.coordinator.data.get("budget_summary", {})
+        data = raw[0] if isinstance(raw, list) else raw
+        expense = data.get("expense", {})
+        if expense:
+            amount = expense.get("total_actual_amount")
+            if amount is not None:
+                return abs(amount)
+        income = data.get("income", {})
+        if income:
+            return income.get("total_actual_amount")
+        return None
 
     @property
     def icon(self) -> str:
         """Return the sensor icon."""
-        return "mdi:tag-multiple"
+        return "mdi:cash-minus"
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -263,16 +273,31 @@ class PocketSmithBudgetSummarySensor(CoordinatorEntity, SensorEntity):
         return "PocketSmith Budget Summary"
 
     @property
+    def _summary_data(self) -> dict:
+        """Return the budget summary dict, unwrapping a list if necessary."""
+        raw = self.coordinator.data.get("budget_summary", {})
+        if isinstance(raw, list):
+            return raw[0] if raw else {}
+        return raw
+
+    @property
     def native_value(self):
-        """Return total actual amount from expense or income analysis."""
-        summary = self.coordinator.data.get("budget_summary", {})
-        expense = summary.get("expense")
+        """Return total_under_by from expense or income analysis."""
+        data = self._summary_data
+        expense = data.get("expense", {})
         if expense:
-            return expense.get("total_actual_amount")
-        income = summary.get("income")
+            return expense.get("total_under_by")
+        income = data.get("income", {})
         if income:
-            return income.get("total_actual_amount")
+            return income.get("total_under_by")
         return None
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        """Return the currency code from expense or income analysis."""
+        data = self._summary_data
+        code = data.get("expense", {}).get("currency_code") or data.get("income", {}).get("currency_code") or "AUD"
+        return code.upper()
 
     @property
     def icon(self) -> str:
@@ -301,12 +326,33 @@ class PocketSmithTrendAnalysisSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Trend Analysis"
+        return "PocketSmith Total Trend Spend"
 
     @property
     def native_value(self):
-        """Return the count of trend analysis packages."""
-        return len(self.coordinator.data.get("trend_analysis", []))
+        """Return total absolute expense spend across all trend analysis packages."""
+        total = 0.0
+        for package in self.coordinator.data.get("trend_analysis", []):
+            expense = package.get("expense")
+            if expense:
+                amount = expense.get("total_actual_amount")
+                if amount is not None:
+                    total += abs(amount)
+        return round(total, 2)
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        """Return the currency code from the first trend analysis package."""
+        packages = self.coordinator.data.get("trend_analysis", [])
+        if packages:
+            first = packages[0]
+            code = (
+                (first.get("expense") or {}).get("currency_code")
+                or (first.get("income") or {}).get("currency_code")
+                or "AUD"
+            )
+            return code.upper()
+        return "AUD"
 
     @property
     def icon(self) -> str:

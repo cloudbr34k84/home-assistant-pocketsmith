@@ -363,9 +363,9 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         return budget
 
     async def _fetch_budget_summary(self, session: aiohttp.ClientSession, user_id: int) -> list:
-        """Return budget summary for the given user over the past 365 days."""
+        """Return budget summary for the given user for the current calendar month."""
         today = date.today()
-        start_date = today - timedelta(days=365)
+        start_date = today.replace(day=1)
         url = (
             "%s/users/%s/budget_summary?period=weeks&interval=1&start_date=%s&end_date=%s&per_page=1000"
             % (_API_BASE, user_id, start_date.isoformat(), today.isoformat())
