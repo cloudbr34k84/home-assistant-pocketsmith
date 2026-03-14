@@ -1,2 +1,2 @@
 """Constants for the PocketSmith integration."""
-DOMAIN = "pocketsmith"
+DOMAIN = "ha_pocketsmith"
