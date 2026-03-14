@@ -41,6 +41,13 @@ async def async_setup_entry(
         for account in coordinator.data["accounts"]
     ]
     sensors.append(PocketsmithUncategorisedTransactions(coordinator))
+    sensors.append(PocketSmithCategoriesSensor(coordinator))
+    sensors.extend(
+        PocketSmithBudgetSensor(coordinator, package)
+        for package in coordinator.data.get("budget", [])
+    )
+    sensors.append(PocketSmithBudgetSummarySensor(coordinator))
+    sensors.append(PocketSmithTrendAnalysisSensor(coordinator))
     async_add_entities(sensors)
 
 
@@ -132,3 +139,181 @@ class PocketsmithUncategorisedTransactions(CoordinatorEntity, SensorEntity):
     def icon(self) -> str:
         """Return the sensor icon."""
         return "mdi:alert-circle-outline"
+
+
+class PocketSmithCategoriesSensor(CoordinatorEntity, SensorEntity):
+    """Sensor reporting the total number of PocketSmith categories."""
+
+    def __init__(self, coordinator: PocketSmithCoordinator) -> None:
+        """Initialise the sensor."""
+        super().__init__(coordinator)
+        self._user_id = coordinator.data["user_id"]
+
+    @property
+    def unique_id(self) -> str:
+        """Return a unique ID for this sensor."""
+        return "pocketsmith_%s_categories" % self._user_id
+
+    @property
+    def name(self) -> str:
+        """Return the sensor name."""
+        return "PocketSmith Categories"
+
+    @property
+    def native_value(self):
+        """Return the count of categories."""
+        return len(self.coordinator.data.get("categories", []))
+
+    @property
+    def icon(self) -> str:
+        """Return the sensor icon."""
+        return "mdi:tag-multiple"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return the full categories list as an attribute."""
+        return {"categories": self.coordinator.data.get("categories", [])}
+
+
+class PocketSmithBudgetSensor(CoordinatorEntity, SensorEntity):
+    """Sensor representing a single PocketSmith budget analysis package."""
+
+    def __init__(self, coordinator: PocketSmithCoordinator, package: dict) -> None:
+        """Initialise the sensor."""
+        super().__init__(coordinator)
+        category = package["category"]
+        self._category_id = category["id"]
+        self._category_slug = category["title"].replace(" ", "_").lower()
+
+    @property
+    def _package(self) -> dict:
+        """Return the current package from coordinator data by category id."""
+        for pkg in self.coordinator.data.get("budget", []):
+            if pkg.get("category", {}).get("id") == self._category_id:
+                return pkg
+        return {}
+
+    @property
+    def unique_id(self) -> str:
+        """Return a stable unique ID for this sensor."""
+        return "pocketsmith_%s_%s_budget" % (self._category_id, self._category_slug)
+
+    @property
+    def name(self) -> str:
+        """Return the sensor name."""
+        title = self._package.get("category", {}).get("title", self._category_slug)
+        return "PocketSmith Budget %s" % title
+
+    @property
+    def native_value(self):
+        """Return the total forecast amount from expense or income analysis."""
+        expense = self._package.get("expense")
+        if expense:
+            return expense.get("total_forecast_amount")
+        income = self._package.get("income")
+        if income:
+            return income.get("total_forecast_amount")
+        return None
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        """Return the currency code from the expense or income analysis."""
+        expense = self._package.get("expense")
+        if expense:
+            return expense.get("currency_code", "USD").upper()
+        income = self._package.get("income")
+        if income:
+            return income.get("currency_code", "USD").upper()
+        return "USD"
+
+    @property
+    def icon(self) -> str:
+        """Return the sensor icon."""
+        return "mdi:cash-clock"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return budget analysis details as attributes."""
+        category = self._package.get("category", {})
+        return {
+            "category_id": category.get("id"),
+            "category_title": category.get("title"),
+            "is_transfer": self._package.get("is_transfer"),
+            "expense": self._package.get("expense"),
+            "income": self._package.get("income"),
+        }
+
+
+class PocketSmithBudgetSummarySensor(CoordinatorEntity, SensorEntity):
+    """Sensor reporting the PocketSmith budget summary."""
+
+    def __init__(self, coordinator: PocketSmithCoordinator) -> None:
+        """Initialise the sensor."""
+        super().__init__(coordinator)
+        self._user_id = coordinator.data["user_id"]
+
+    @property
+    def unique_id(self) -> str:
+        """Return a unique ID for this sensor."""
+        return "pocketsmith_%s_budget_summary" % self._user_id
+
+    @property
+    def name(self) -> str:
+        """Return the sensor name."""
+        return "PocketSmith Budget Summary"
+
+    @property
+    def native_value(self):
+        """Return total actual amount from expense or income analysis."""
+        summary = self.coordinator.data.get("budget_summary", {})
+        expense = summary.get("expense")
+        if expense:
+            return expense.get("total_actual_amount")
+        income = summary.get("income")
+        if income:
+            return income.get("total_actual_amount")
+        return None
+
+    @property
+    def icon(self) -> str:
+        """Return the sensor icon."""
+        return "mdi:calculator-variant"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return the full budget summary as attributes."""
+        return self.coordinator.data.get("budget_summary", {})
+
+
+class PocketSmithTrendAnalysisSensor(CoordinatorEntity, SensorEntity):
+    """Sensor reporting the PocketSmith trend analysis package count."""
+
+    def __init__(self, coordinator: PocketSmithCoordinator) -> None:
+        """Initialise the sensor."""
+        super().__init__(coordinator)
+        self._user_id = coordinator.data["user_id"]
+
+    @property
+    def unique_id(self) -> str:
+        """Return a unique ID for this sensor."""
+        return "pocketsmith_%s_trend_analysis" % self._user_id
+
+    @property
+    def name(self) -> str:
+        """Return the sensor name."""
+        return "PocketSmith Trend Analysis"
+
+    @property
+    def native_value(self):
+        """Return the count of trend analysis packages."""
+        return len(self.coordinator.data.get("trend_analysis", []))
+
+    @property
+    def icon(self) -> str:
+        """Return the sensor icon."""
+        return "mdi:chart-line"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return the full trend analysis list as an attribute."""
+        return {"trend_analysis": self.coordinator.data.get("trend_analysis", [])}
