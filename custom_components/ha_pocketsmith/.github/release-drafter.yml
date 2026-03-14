@@ -1,0 +1,58 @@
+# Template for the automatically generated release notes
+name-template: 'PocketSmith v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+# Categorise commits into sections based on conventional commit types
+categories:
+  - title: '🚀 New Features'
+    labels:
+      - 'feature'
+    collapse-after: 10
+  - title: '🐛 Bug Fixes'
+    labels:
+      - 'bug'
+    collapse-after: 10
+  - title: '🧰 Improvements'
+    labels:
+      - 'improvement'
+    collapse-after: 10
+  - title: '📝 Documentation'
+    labels:
+      - 'documentation'
+    collapse-after: 10
+
+# Map conventional commit prefixes to labels
+autolabeler:
+  - label: 'feature'
+    title:
+      - '/^feat/i'
+  - label: 'bug'
+    title:
+      - '/^fix/i'
+  - label: 'improvement'
+    title:
+      - '/^refactor/i'
+      - '/^chore/i'
+  - label: 'documentation'
+    title:
+      - '/^docs/i'
+
+# Template for the release body
+template: |
+  ## What's Changed
+  $CHANGES
+
+# Automatically bump version based on commit types
+version-resolver:
+  major:
+    labels:
+      - 'breaking-change'
+  minor:
+    labels:
+      - 'feature'
+  patch:
+    labels:
+      - 'bug'
+      - 'improvement'
+      - 'documentation'
+  default: patch
