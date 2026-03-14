@@ -1,0 +1,33 @@
+name: Update Manifest Version
+
+# Trigger this workflow whenever a new release is published on GitHub
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout the main branch so we can make changes to it
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      # Strip the 'v' prefix from the tag (e.g. v0.2.4 becomes 0.2.4)
+      # Then update the version field in manifest.json using jq
+      - name: Update version in manifest.json
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          jq --arg version "$VERSION" '.version = $version' custom_components/ha_pocketsmith/manifest.json > tmp.json
+          mv tmp.json custom_components/ha_pocketsmith/manifest.json
+
+      # Commit the updated manifest.json back to the main branch
+      # Uses the github-actions bot as the commit author
+      - name: Commit and push updated manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add custom_components/ha_pocketsmith/manifest.json
+          git commit -m "Bump version to ${GITHUB_REF_NAME}"
+          git push
