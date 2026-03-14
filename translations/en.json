@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to PocketSmith",
+        "description": "Enter your PocketSmith developer key. You can find it under PocketSmith \u2192 Settings \u2192 API.",
+        "data": {
+          "developer_key": "Developer Key"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid developer key. Please check and try again.",
+      "cannot_connect": "Unable to reach the PocketSmith API. Check your network connection.",
+      "unknown": "An unexpected error occurred. Check the Home Assistant logs."
+    },
+    "abort": {
+      "already_configured": "PocketSmith is already configured."
+    }
+  }
+}

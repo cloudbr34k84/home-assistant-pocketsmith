@@ -1,31 +1,48 @@
 """PocketSmith Integration."""
 import logging
-from homeassistant.helpers import discovery
+from datetime import timedelta
+
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
+
 from .const import DOMAIN
+from .coordinator import PocketSmithCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+_UPDATE_INTERVAL = timedelta(minutes=5)
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up the PocketSmith component."""
-    hass.data.setdefault(DOMAIN, {})
+    """YAML configuration is no longer supported."""
     if DOMAIN in config:
-        developer_key = config[DOMAIN].get("developer_key")
-        hass.data[DOMAIN] = {"developer_key": developer_key}
-        await discovery.async_load_platform(hass, "sensor", DOMAIN, {}, config)
+        _LOGGER.warning(
+            "PocketSmith YAML configuration is no longer supported. "
+            "Please migrate to a config entry via Settings \u2192 Integrations."
+        )
     return True
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up PocketSmith from a config entry."""
+    coordinator = PocketSmithCoordinator(
+        hass,
+        developer_key=entry.data["developer_key"],
+        update_interval=_UPDATE_INTERVAL,
+    )
+
+    await coordinator.async_config_entry_first_refresh()
+
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN] = {"developer_key": entry.data.get("developer_key")}
+    hass.data[DOMAIN][entry.entry_id] = coordinator
+
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
     return True
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Handle unloading of an entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, ["sensor"])
-    if unload_ok and DOMAIN in hass.data:
-        hass.data.pop(DOMAIN)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
     return unload_ok
