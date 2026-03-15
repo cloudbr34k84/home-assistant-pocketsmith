@@ -6,6 +6,9 @@
         "description": "Enter your PocketSmith developer key. You can find it under PocketSmith \u2192 Settings \u2192 API.",
         "data": {
           "developer_key": "Developer Key"
+        },
+        "data_description": {
+          "developer_key": "Your PocketSmith developer API key. Find it in PocketSmith under Settings → API → Developer Keys."
         }
       }
     },

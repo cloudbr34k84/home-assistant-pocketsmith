@@ -22,7 +22,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up PocketSmith binary sensors from a config entry."""
-    coordinator: PocketSmithCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: PocketSmithCoordinator = entry.runtime_data
 
     async_add_entities([
         PocketSmithOverBudgetBinarySensor(coordinator),
@@ -33,6 +33,8 @@ async def async_setup_entry(
 
 class PocketSmithOverBudgetBinarySensor(CoordinatorEntity, BinarySensorEntity):
     """Binary sensor that is on when any non-transfer category is over budget."""
+
+    _attr_has_entity_name = True
 
     def __init__(self, coordinator: PocketSmithCoordinator) -> None:
         """Initialise the sensor."""
@@ -99,6 +101,8 @@ class PocketSmithOverBudgetBinarySensor(CoordinatorEntity, BinarySensorEntity):
 class PocketSmithForecastNeedsRecalculateBinarySensor(CoordinatorEntity, BinarySensorEntity):
     """Binary sensor that is on when the forecast is stale or missing."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, coordinator: PocketSmithCoordinator) -> None:
         """Initialise the sensor."""
         super().__init__(coordinator)
@@ -154,6 +158,8 @@ class PocketSmithForecastNeedsRecalculateBinarySensor(CoordinatorEntity, BinaryS
 
 class PocketSmithHasUncategorisedBinarySensor(CoordinatorEntity, BinarySensorEntity):
     """Binary sensor that is on when there are uncategorised transactions."""
+
+    _attr_has_entity_name = True
 
     def __init__(self, coordinator: PocketSmithCoordinator) -> None:
         """Initialise the sensor."""

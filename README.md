@@ -99,6 +99,17 @@ custom_components/
 
 No changes to `configuration.yaml` are required.
 
+## Removal
+
+To remove the PocketSmith integration:
+
+1. Go to **Settings → Integrations** in Home Assistant.
+2. Find **PocketSmith** and click on it.
+3. Click the three-dot menu (⋮) and select **Delete**.
+4. Confirm the removal.
+
+All sensors and entities created by the integration will be removed automatically.
+
 ## Automation Examples
 
 ### Notify on Low Balance:

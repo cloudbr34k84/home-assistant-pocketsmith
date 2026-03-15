@@ -22,8 +22,8 @@ async def system_health_info(hass: HomeAssistant) -> dict[str, Any]:
 
     entry = entries[0]
     try:
-        coordinator = hass.data[DOMAIN][entry.entry_id]
-    except KeyError:
+        coordinator = entry.runtime_data
+    except AttributeError:
         return {"api_reachable": False}
 
     return {

@@ -50,7 +50,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up PocketSmith sensors from a config entry."""
-    coordinator: PocketSmithCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: PocketSmithCoordinator = entry.runtime_data
 
     sensors = [
         PocketSmithSensor(coordinator, account)
@@ -69,6 +69,8 @@ async def async_setup_entry(
 
 class PocketSmithSensor(CoordinatorEntity, SensorEntity):
     """Representation of a PocketSmith account balance sensor."""
+
+    _attr_has_entity_name = True
 
     def __init__(self, coordinator: PocketSmithCoordinator, account: dict) -> None:
         """Initialise the sensor."""
@@ -130,6 +132,8 @@ class PocketSmithSensor(CoordinatorEntity, SensorEntity):
 class PocketSmithUncategorisedTransactions(CoordinatorEntity, SensorEntity):
     """Sensor reporting the count of uncategorised transactions."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, coordinator: PocketSmithCoordinator) -> None:
         """Initialise the sensor."""
         super().__init__(coordinator)
@@ -167,6 +171,8 @@ class PocketSmithUncategorisedTransactions(CoordinatorEntity, SensorEntity):
 
 class PocketSmithCategoriesSensor(CoordinatorEntity, SensorEntity):
     """Sensor reporting the total number of PocketSmith categories."""
+
+    _attr_has_entity_name = True
 
     def __init__(self, coordinator: PocketSmithCoordinator) -> None:
         """Initialise the sensor."""
@@ -209,6 +215,8 @@ class PocketSmithCategoriesSensor(CoordinatorEntity, SensorEntity):
 
 class PocketSmithCategorySensor(CoordinatorEntity, SensorEntity):
     """Sensor representing a single enriched PocketSmith category."""
+
+    _attr_has_entity_name = True
 
     def __init__(self, coordinator: PocketSmithCoordinator, enriched_category: dict) -> None:
         """Initialise the sensor."""
@@ -280,6 +288,8 @@ class PocketSmithCategorySensor(CoordinatorEntity, SensorEntity):
 class PocketSmithNetWorthSensor(CoordinatorEntity, SensorEntity):
     """Sensor reporting the total net worth across all accounts."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, coordinator: PocketSmithCoordinator) -> None:
         """Initialise the sensor."""
         super().__init__(coordinator)
@@ -325,6 +335,8 @@ class PocketSmithNetWorthSensor(CoordinatorEntity, SensorEntity):
 
 class PocketSmithUserSensor(CoordinatorEntity, SensorEntity):
     """Sensor reporting PocketSmith user profile information."""
+
+    _attr_has_entity_name = True
 
     def __init__(self, coordinator: PocketSmithCoordinator) -> None:
         """Initialise the sensor."""
