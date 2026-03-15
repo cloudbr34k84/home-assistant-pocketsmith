@@ -7,6 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .coordinator import PocketSmithCoordinator
@@ -136,7 +137,7 @@ class PocketSmithForecastNeedsRecalculateBinarySensor(CoordinatorEntity, BinaryS
                 return True
         if last_updated.tzinfo is None:
             last_updated = last_updated.replace(tzinfo=timezone.utc)
-        age = datetime.now(timezone.utc) - last_updated
+        age = dt_util.utcnow() - last_updated
         return age.total_seconds() > 86400
 
     @property
@@ -152,7 +153,7 @@ class PocketSmithForecastNeedsRecalculateBinarySensor(CoordinatorEntity, BinaryS
                 return "mdi:refresh-circle"
         if last_updated.tzinfo is None:
             last_updated = last_updated.replace(tzinfo=timezone.utc)
-        stale = (datetime.now(timezone.utc) - last_updated).total_seconds() > 86400
+        stale = (dt_util.utcnow() - last_updated).total_seconds() > 86400
         return "mdi:refresh-circle" if stale else "mdi:check-circle"
 
 
