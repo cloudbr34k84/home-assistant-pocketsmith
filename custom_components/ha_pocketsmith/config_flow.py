@@ -5,16 +5,9 @@ import logging
 import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import (
-    DOMAIN,
-    CONF_PERIOD,
-    CONF_INTERVAL,
-    PERIOD_OPTIONS,
-    INTERVAL_OPTIONS,
-)
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 _API_ME = "https://api.pocketsmith.com/v2/me"
@@ -41,12 +34,6 @@ class PocketSmithConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle the PocketSmith UI setup flow."""
 
     VERSION = 1
-
-    @staticmethod
-    @callback
-    def async_get_options_flow(config_entry):
-        """Create the options flow."""
-        return PocketSmithOptionsFlow()
 
     async def async_step_user(self, user_input=None):
         """Handle the initial setup step."""
@@ -76,28 +63,4 @@ class PocketSmithConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=vol.Schema({vol.Required("developer_key"): str}),
             errors=errors,
-        )
-
-
-OPTIONS_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_PERIOD): vol.In(PERIOD_OPTIONS),
-        vol.Required(CONF_INTERVAL): vol.In(INTERVAL_OPTIONS),
-    }
-)
-
-
-class PocketSmithOptionsFlow(config_entries.OptionsFlowWithReload):
-    """Handle PocketSmith options (period and interval)."""
-
-    async def async_step_init(self, user_input=None):
-        """Show the options form."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
-
-        return self.async_show_form(
-            step_id="init",
-            data_schema=self.add_suggested_values_to_schema(
-                OPTIONS_SCHEMA, self.config_entry.options
-            ),
         )

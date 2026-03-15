@@ -1,7 +1,6 @@
 """DataUpdateCoordinator for PocketSmith."""
 import asyncio
 import logging
-import calendar
 from datetime import date, datetime, timedelta, timezone
 
 import aiohttp
@@ -10,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN, CONF_PERIOD, CONF_INTERVAL, DEFAULT_PERIOD, DEFAULT_INTERVAL
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -58,7 +57,6 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             uncategorised_count = await self._fetch_uncategorised_count(session, user_id)
             categories = await self._fetch_categories(session, user_id)
             budget = await self._fetch_budget(session, user_id)
-            budget_summary = await self._fetch_budget_summary(session, user_id)
         except aiohttp.ClientError as err:
             raise UpdateFailed(
                 "Unable to reach the PocketSmith API. Check your network connection."
@@ -77,7 +75,6 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             "uncategorised_count": uncategorised_count,
             "categories": categories,
             "budget": budget,
-            "budget_summary": budget_summary,
             "enriched_categories": enriched_categories,
             "forecast_last_updated": datetime.now(timezone.utc),
         }
@@ -368,65 +365,6 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
 
         _LOGGER.debug("Fetched budget for user %s", user_id)
         return budget
-
-    async def _fetch_budget_summary(self, session: aiohttp.ClientSession, user_id: int) -> list:
-        """Return budget summary for the given user for the current calendar month."""
-        today = date.today()
-        start_date = today.replace(day=1)
-        end_date = today.replace(day=calendar.monthrange(today.year, today.month)[1])
-        period = self._entry.options.get(CONF_PERIOD, DEFAULT_PERIOD)
-        interval = self._entry.options.get(CONF_INTERVAL, DEFAULT_INTERVAL)
-        url = (
-            "%s/users/%s/budget_summary?period=%s&interval=%s&start_date=%s&end_date=%s&per_page=1000"
-            % (_API_BASE, user_id, period, interval, start_date.isoformat(), end_date.isoformat())
-        )
-
-        async with asyncio.timeout(_REQUEST_TIMEOUT):
-            async with session.get(url, headers=self._headers) as response:
-                if response.status == 400:
-                    try:
-                        error_body = (await response.json()).get("error", "unknown error")
-                    except Exception:
-                        error_body = "unknown error"
-                    raise UpdateFailed(
-                        "PocketSmith returned a bad request error: %s. This may indicate a bug in the integration." % error_body
-                    )
-                if response.status == 401:
-                    raise UpdateFailed(
-                        "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
-                        "Reconfigure the integration to fix this."
-                    )
-                if response.status == 403:
-                    raise UpdateFailed(
-                        "PocketSmith access denied — your developer key lacks the required permissions "
-                        "to read your budget summary."
-                    )
-                if response.status == 404:
-                    raise UpdateFailed(
-                        "PocketSmith could not find your budget summary data. This may be a temporary API issue."
-                    )
-                if response.status == 405:
-                    raise UpdateFailed(
-                        "PocketSmith returned Method Not Allowed (HTTP 405). This is likely a bug in the integration — please report it."
-                    )
-                if response.status == 429:
-                    raise UpdateFailed(
-                        "PocketSmith API rate limit exceeded. The integration will retry on the next update."
-                    )
-                if response.status == 503:
-                    raise UpdateFailed(
-                        "PocketSmith is temporarily unavailable for maintenance (HTTP 503). The integration will retry on the next update."
-                    )
-                if response.status >= 500:
-                    raise UpdateFailed(
-                        "PocketSmith is experiencing server issues (HTTP %s). "
-                        "Data will refresh when the service recovers." % response.status
-                    )
-                response.raise_for_status()
-                budget_summary = await response.json()
-
-        _LOGGER.debug("Fetched budget summary for user %s", user_id)
-        return budget_summary
 
     def _build_enriched_categories(self, categories: list, budget: list) -> list:
         """Return a flat enriched list of all categories with budget data."""

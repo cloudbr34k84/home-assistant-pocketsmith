@@ -38,7 +38,6 @@ class PocketSmithOverBudgetBinarySensor(CoordinatorEntity, BinarySensorEntity):
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
-        self._attr_device_info = _make_device_info(coordinator)
         self._attr_device_class = BinarySensorDeviceClass.PROBLEM
 
     @property
@@ -104,7 +103,6 @@ class PocketSmithForecastNeedsRecalculateBinarySensor(CoordinatorEntity, BinaryS
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
-        self._attr_device_info = _make_device_info(coordinator)
 
     @property
     def device_info(self):
@@ -161,7 +159,6 @@ class PocketSmithHasUncategorisedBinarySensor(CoordinatorEntity, BinarySensorEnt
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
-        self._attr_device_info = _make_device_info(coordinator)
         self._attr_device_class = BinarySensorDeviceClass.PROBLEM
 
     @property
