@@ -45,6 +45,8 @@ async def async_setup_entry(
     sensors.extend(
         PocketSmithBudgetSensor(coordinator, package)
         for package in coordinator.data.get("budget", [])
+        if not package.get("is_transfer")
+        and package.get("category", {}).get("parent_id") is None
     )
     sensors.append(PocketSmithBudgetSummarySensor(coordinator))
     sensors.append(PocketSmithTrendAnalysisSensor(coordinator))
@@ -214,15 +216,28 @@ class PocketSmithBudgetSensor(CoordinatorEntity, SensorEntity):
         title = self._package.get("category", {}).get("title", self._category_slug)
         return "PocketSmith Budget %s" % title
 
+    def _current_period(self) -> dict:
+        """Return the period where current is True, from expense then income analysis."""
+        analysis = self._package.get("expense") or self._package.get("income")
+        if analysis:
+            for period in analysis.get("periods", []):
+                if period.get("current"):
+                    return period
+        return {}
+
     @property
     def native_value(self):
-        """Return the total forecast amount from expense or income analysis."""
-        expense = self._package.get("expense")
-        if expense:
-            return expense.get("total_forecast_amount")
-        income = self._package.get("income")
-        if income:
-            return income.get("total_forecast_amount")
+        """Return the actual amount for the current period."""
+        period = self._current_period()
+        if period:
+            amount = period.get("actual_amount")
+            if amount is not None:
+                return abs(amount)
+        analysis = self._package.get("expense") or self._package.get("income")
+        if analysis:
+            total = analysis.get("total_actual_amount")
+            if total is not None:
+                return abs(total)
         return None
 
     @property
@@ -238,19 +253,33 @@ class PocketSmithBudgetSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def icon(self) -> str:
-        """Return the sensor icon."""
-        return "mdi:cash-clock"
+        """Return the sensor icon based on whether the current period is over budget."""
+        period = self._current_period()
+        if period.get("over_budget"):
+            return "mdi:cash-remove"
+        return "mdi:cash-check"
 
     @property
     def extra_state_attributes(self) -> dict:
-        """Return budget analysis details as attributes."""
+        """Return budget period details as attributes."""
         category = self._package.get("category", {})
+        period = self._current_period()
+        if not period:
+            return {
+                "category_id": category.get("id"),
+                "category_title": category.get("title"),
+            }
+        analysis = self._package.get("expense") or self._package.get("income")
         return {
+            "budgeted": abs(period["forecast_amount"]) if period.get("forecast_amount") is not None else None,
+            "actual": abs(period["actual_amount"]) if period.get("actual_amount") is not None else None,
+            "remaining": period.get("under_by"),
+            "over_by": period.get("over_by"),
+            "over_budget": period.get("over_budget"),
+            "percentage_used": period.get("percentage_used"),
+            "currency": analysis.get("currency_code", "USD").upper() if analysis else "USD",
             "category_id": category.get("id"),
             "category_title": category.get("title"),
-            "is_transfer": self._package.get("is_transfer"),
-            "expense": self._package.get("expense"),
-            "income": self._package.get("income"),
         }
 
 

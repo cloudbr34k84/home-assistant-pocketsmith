@@ -4,11 +4,12 @@ import logging
 from datetime import date, timedelta
 
 import aiohttp
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_PERIOD, CONF_INTERVAL, DEFAULT_PERIOD, DEFAULT_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ def _parse_link_next(link_header: str):
 class PocketSmithCoordinator(DataUpdateCoordinator):
     """Fetch all PocketSmith data in a single coordinated update."""
 
-    def __init__(self, hass: HomeAssistant, developer_key: str, update_interval) -> None:
+    def __init__(self, hass: HomeAssistant, developer_key: str, update_interval, entry: ConfigEntry) -> None:
         """Initialise the coordinator."""
         super().__init__(
             hass,
@@ -39,6 +40,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             update_interval=update_interval,
         )
         self._developer_key = developer_key
+        self._entry = entry
         self._headers = {
             "Accept": "application/json",
             "Authorization": "Key %s" % developer_key,
@@ -366,9 +368,11 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         """Return budget summary for the given user for the current calendar month."""
         today = date.today()
         start_date = today.replace(day=1)
+        period = self._entry.options.get(CONF_PERIOD, DEFAULT_PERIOD)
+        interval = self._entry.options.get(CONF_INTERVAL, DEFAULT_INTERVAL)
         url = (
-            "%s/users/%s/budget_summary?period=weeks&interval=1&start_date=%s&end_date=%s&per_page=1000"
-            % (_API_BASE, user_id, start_date.isoformat(), today.isoformat())
+            "%s/users/%s/budget_summary?period=%s&interval=%s&start_date=%s&end_date=%s&per_page=1000"
+            % (_API_BASE, user_id, period, interval, start_date.isoformat(), today.isoformat())
         )
 
         async with asyncio.timeout(_REQUEST_TIMEOUT):

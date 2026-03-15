@@ -7,7 +7,15 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN
+from .const import (
+    DOMAIN,
+    CONF_PERIOD,
+    CONF_INTERVAL,
+    DEFAULT_PERIOD,
+    DEFAULT_INTERVAL,
+    PERIOD_OPTIONS,
+    INTERVAL_OPTIONS,
+)
 
 _LOGGER = logging.getLogger(__name__)
 _API_ME = "https://api.pocketsmith.com/v2/me"
@@ -35,6 +43,11 @@ class PocketSmithConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    @staticmethod
+    def async_get_options_flow(config_entry):
+        """Return the options flow handler."""
+        return PocketSmithOptionsFlow(config_entry)
+
     async def async_step_user(self, user_input=None):
         """Handle the initial setup step."""
         await self.async_set_unique_id(DOMAIN)
@@ -45,7 +58,7 @@ class PocketSmithConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 await _validate_developer_key(self.hass, user_input["developer_key"])
             except ValueError as err:
-                errors["base"] = str(err)  # "invalid_auth"
+                errors["base"] = str(err)
             except aiohttp.ClientError:
                 errors["base"] = "cannot_connect"
             except asyncio.TimeoutError:
@@ -63,4 +76,30 @@ class PocketSmithConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=vol.Schema({vol.Required("developer_key"): str}),
             errors=errors,
+        )
+
+
+class PocketSmithOptionsFlow(config_entries.OptionsFlow):
+    """Handle PocketSmith options (period and interval)."""
+
+    def __init__(self, config_entry) -> None:
+        """Initialise the options flow."""
+        self._config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        """Show the options form."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        current_period = self._config_entry.options.get(CONF_PERIOD, DEFAULT_PERIOD)
+        current_interval = self._config_entry.options.get(CONF_INTERVAL, DEFAULT_INTERVAL)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_PERIOD, default=current_period): vol.In(PERIOD_OPTIONS),
+                    vol.Required(CONF_INTERVAL, default=current_interval): vol.In(INTERVAL_OPTIONS),
+                }
+            ),
         )
