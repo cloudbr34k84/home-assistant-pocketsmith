@@ -11,6 +11,7 @@
     },
     "error": {
       "invalid_auth": "Invalid developer key. Please check and try again.",
+      "insufficient_permissions": "Your PocketSmith developer key does not have sufficient permissions. Please check your API key settings.",
       "cannot_connect": "Unable to reach the PocketSmith API. Check your network connection.",
       "unknown": "An unexpected error occurred. Check the Home Assistant logs."
     },

@@ -2,7 +2,7 @@
 import asyncio
 import logging
 import calendar
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
@@ -39,6 +39,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             _LOGGER,
             name=DOMAIN,
             update_interval=update_interval,
+            config_entry=entry,
         )
         self._developer_key = developer_key
         self._entry = entry
@@ -80,6 +81,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             "budget_summary": budget_summary,
             "trend_analysis": trend_analysis,
             "enriched_categories": enriched_categories,
+            "forecast_last_updated": datetime.now(timezone.utc),
         }
 
     async def _fetch_user_id(self, session: aiohttp.ClientSession) -> int:
@@ -551,7 +553,10 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                         response.raise_for_status()
                         page_data = await response.json()
                         next_url = _parse_link_next(response.headers.get("Link", ""))
-                        trend_analysis.extend(page_data)
+                        if isinstance(page_data, dict):
+                            trend_analysis.append(page_data)
+                        elif isinstance(page_data, list):
+                            trend_analysis.extend(page_data)
 
             current_url = next_url
 
@@ -590,7 +595,10 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                         )
                     page_data = await retry_response.json()
                     next_retry_url = _parse_link_next(retry_response.headers.get("Link", ""))
-                    trend_analysis.extend(page_data)
+                    if isinstance(page_data, dict):
+                        trend_analysis.append(page_data)
+                    elif isinstance(page_data, list):
+                        trend_analysis.extend(page_data)
 
             current_retry_url = next_retry_url
 
