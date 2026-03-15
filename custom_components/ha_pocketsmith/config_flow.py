@@ -5,14 +5,13 @@ import logging
 import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     DOMAIN,
     CONF_PERIOD,
     CONF_INTERVAL,
-    DEFAULT_PERIOD,
-    DEFAULT_INTERVAL,
     PERIOD_OPTIONS,
     INTERVAL_OPTIONS,
 )
@@ -44,9 +43,10 @@ class PocketSmithConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     @staticmethod
+    @callback
     def async_get_options_flow(config_entry):
-        """Return the options flow handler."""
-        return PocketSmithOptionsFlow(config_entry)
+        """Create the options flow."""
+        return PocketSmithOptionsFlow()
 
     async def async_step_user(self, user_input=None):
         """Handle the initial setup step."""
@@ -79,27 +79,25 @@ class PocketSmithConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
 
-class PocketSmithOptionsFlow(config_entries.OptionsFlow):
-    """Handle PocketSmith options (period and interval)."""
+OPTIONS_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_PERIOD): vol.In(PERIOD_OPTIONS),
+        vol.Required(CONF_INTERVAL): vol.In(INTERVAL_OPTIONS),
+    }
+)
 
-    def __init__(self, config_entry) -> None:
-        """Initialise the options flow."""
-        self._config_entry = config_entry
+
+class PocketSmithOptionsFlow(config_entries.OptionsFlowWithReload):
+    """Handle PocketSmith options (period and interval)."""
 
     async def async_step_init(self, user_input=None):
         """Show the options form."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        current_period = self._config_entry.options.get(CONF_PERIOD, DEFAULT_PERIOD)
-        current_interval = self._config_entry.options.get(CONF_INTERVAL, DEFAULT_INTERVAL)
-
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_PERIOD, default=current_period): vol.In(PERIOD_OPTIONS),
-                    vol.Required(CONF_INTERVAL, default=current_interval): vol.In(INTERVAL_OPTIONS),
-                }
+            data_schema=self.add_suggested_values_to_schema(
+                OPTIONS_SCHEMA, self.config_entry.options
             ),
         )

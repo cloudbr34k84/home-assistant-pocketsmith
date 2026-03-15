@@ -1,9 +1,11 @@
 """PocketSmith sensor platform."""
 import logging
 
+from homeassistant.components.device_registry import DeviceEntryType
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -11,6 +13,17 @@ from .const import DOMAIN
 from .coordinator import PocketSmithCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _make_device_info(coordinator) -> DeviceInfo:
+    """Return a shared DeviceInfo for all PocketSmith sensors."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, str(coordinator.data["user_id"]))},
+        name="PocketSmith — %s" % coordinator.data.get("user", {}).get("name", "User"),
+        manufacturer="PocketSmith",
+        entry_type=DeviceEntryType.SERVICE,
+    )
+
 
 ACCOUNT_BALANCE_DESCRIPTION = SensorEntityDescription(
     key="balance",
@@ -48,6 +61,7 @@ async def async_setup_entry(
     )
     sensors.append(PocketSmithBudgetSummarySensor(coordinator))
     sensors.append(PocketSmithTrendAnalysisSensor(coordinator))
+    sensors.append(PocketSmithUserSensor(coordinator))
     async_add_entities(sensors)
 
 
@@ -62,6 +76,7 @@ class PocketSmithSensor(CoordinatorEntity, SensorEntity):
         account_title = account.get("title", "Unnamed Account")
         self._account_title_slug = account_title.replace(" ", "_").lower()
         self.entity_description = ACCOUNT_BALANCE_DESCRIPTION
+        self._attr_device_info = _make_device_info(coordinator)
 
     @property
     def _account(self) -> dict:
@@ -80,7 +95,7 @@ class PocketSmithSensor(CoordinatorEntity, SensorEntity):
     def name(self) -> str:
         """Return the sensor name."""
         account_title = self._account.get("title", "Unnamed Account")
-        return "PocketSmith Account %s %s" % (account_title, self.entity_description.name)
+        return "PocketSmith %s Balance" % account_title
 
     @property
     def native_value(self):
@@ -114,6 +129,7 @@ class PocketsmithUncategorisedTransactions(CoordinatorEntity, SensorEntity):
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
+        self._attr_device_info = _make_device_info(coordinator)
 
     @property
     def unique_id(self) -> str:
@@ -123,7 +139,7 @@ class PocketsmithUncategorisedTransactions(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "Pocketsmith Uncategorised Transactions"
+        return "PocketSmith Uncategorised Transactions"
 
     @property
     def native_value(self):
@@ -148,6 +164,7 @@ class PocketSmithCategoriesSensor(CoordinatorEntity, SensorEntity):
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
+        self._attr_device_info = _make_device_info(coordinator)
 
     @property
     def unique_id(self) -> str:
@@ -195,6 +212,7 @@ class PocketSmithCategorySensor(CoordinatorEntity, SensorEntity):
         import re
         raw_slug = enriched_category.get("category_title", "").lower().replace(" ", "_")
         self._category_slug = re.sub(r"[^\w]", "", raw_slug)
+        self._attr_device_info = _make_device_info(coordinator)
 
     @property
     def _enriched(self) -> dict:
@@ -248,8 +266,6 @@ class PocketSmithCategorySensor(CoordinatorEntity, SensorEntity):
             "over_by": e.get("over_by"),
             "over_budget": e.get("over_budget"),
             "percentage_used": e.get("percentage_used"),
-            "average_weekly": e.get("average_weekly"),
-            "average_monthly": e.get("average_monthly"),
             "currency": e.get("currency"),
         }
 
@@ -261,6 +277,7 @@ class PocketSmithBudgetSummarySensor(CoordinatorEntity, SensorEntity):
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
+        self._attr_device_info = _make_device_info(coordinator)
 
     @property
     def unique_id(self) -> str:
@@ -317,6 +334,7 @@ class PocketSmithTrendAnalysisSensor(CoordinatorEntity, SensorEntity):
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
+        self._attr_device_info = _make_device_info(coordinator)
 
     @property
     def unique_id(self) -> str:
@@ -366,3 +384,41 @@ class PocketSmithTrendAnalysisSensor(CoordinatorEntity, SensorEntity):
     def extra_state_attributes(self) -> dict:
         """Return the full trend analysis list as an attribute."""
         return {"trend_analysis": self.coordinator.data.get("trend_analysis", [])}
+
+
+class PocketSmithUserSensor(CoordinatorEntity, SensorEntity):
+    """Sensor reporting PocketSmith user profile information."""
+
+    def __init__(self, coordinator: PocketSmithCoordinator) -> None:
+        """Initialise the sensor."""
+        super().__init__(coordinator)
+        self._user_id = coordinator.data["user_id"]
+        self._attr_device_info = _make_device_info(coordinator)
+
+    @property
+    def unique_id(self) -> str:
+        """Return a unique ID for this sensor."""
+        return "pocketsmith_%s_user" % self._user_id
+
+    @property
+    def name(self) -> str:
+        """Return the sensor name."""
+        return "PocketSmith User"
+
+    @property
+    def native_value(self):
+        """Return the user's name."""
+        return self.coordinator.data.get("user", {}).get("name")
+
+    @property
+    def icon(self) -> str:
+        """Return the sensor icon."""
+        return "mdi:account-circle"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return the user profile dict, excluding sensitive keys."""
+        user = self.coordinator.data.get("user")
+        if not user:
+            return {}
+        return {k: v for k, v in user.items() if k not in ("email", "tell_a_friend_code")}

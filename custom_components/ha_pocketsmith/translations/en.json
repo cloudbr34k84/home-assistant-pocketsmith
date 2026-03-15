@@ -33,5 +33,12 @@
         }
       }
     }
+  },
+  "system_health": {
+    "info": {
+      "api_reachable": "Reach PocketSmith API",
+      "last_activity_at": "Last account activity",
+      "forecast_needs_recalculate": "Forecast needs recalculate"
+    }
   }
 }

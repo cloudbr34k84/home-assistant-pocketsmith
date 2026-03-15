@@ -1,6 +1,7 @@
 """DataUpdateCoordinator for PocketSmith."""
 import asyncio
 import logging
+import calendar
 from datetime import date, timedelta
 
 import aiohttp
@@ -51,7 +52,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         session = async_get_clientsession(self.hass)
 
         try:
-            user_id = await self._fetch_user_id(session)
+            user_id, user = await self._fetch_user_id(session)
             accounts = await self._fetch_accounts(session, user_id)
             uncategorised_count = await self._fetch_uncategorised_count(session, user_id)
             categories = await self._fetch_categories(session, user_id)
@@ -67,10 +68,11 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                 "PocketSmith API request timed out. Check your network connection."
             ) from err
 
-        enriched_categories = self._build_enriched_categories(categories, budget, trend_analysis)
+        enriched_categories = self._build_enriched_categories(categories, budget)
 
         return {
             "user_id": user_id,
+            "user": user,
             "accounts": accounts,
             "uncategorised_count": uncategorised_count,
             "categories": categories,
@@ -132,7 +134,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             )
 
         _LOGGER.debug("Fetched user ID: %s", user_id)
-        return user_id
+        return user_id, data
 
     async def _fetch_accounts(self, session: aiohttp.ClientSession, user_id: int) -> list:
         """Return all accounts for the given user."""
@@ -371,11 +373,12 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         """Return budget summary for the given user for the current calendar month."""
         today = date.today()
         start_date = today.replace(day=1)
+        end_date = today.replace(day=calendar.monthrange(today.year, today.month)[1])
         period = self._entry.options.get(CONF_PERIOD, DEFAULT_PERIOD)
         interval = self._entry.options.get(CONF_INTERVAL, DEFAULT_INTERVAL)
         url = (
             "%s/users/%s/budget_summary?period=%s&interval=%s&start_date=%s&end_date=%s&per_page=1000"
-            % (_API_BASE, user_id, period, interval, start_date.isoformat(), today.isoformat())
+            % (_API_BASE, user_id, period, interval, start_date.isoformat(), end_date.isoformat())
         )
 
         async with asyncio.timeout(_REQUEST_TIMEOUT):
@@ -594,8 +597,8 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         _LOGGER.debug("Fetched trend analysis for user %s (via suggested alternative period)", user_id)
         return trend_analysis
 
-    def _build_enriched_categories(self, categories: list, budget: list, trend_analysis: list) -> list:
-        """Return a flat enriched list of all categories with budget and trend data."""
+    def _build_enriched_categories(self, categories: list, budget: list) -> list:
+        """Return a flat enriched list of all categories with budget data."""
 
         def _flatten(cats, flat):
             for cat in cats:
@@ -607,18 +610,16 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
 
         budget_by_category = {}
         for pkg in budget:
+            if not isinstance(pkg, dict):
+                continue
             cat = pkg.get("category")
             if cat:
                 budget_by_category[cat["id"]] = pkg
 
-        trend_by_category = {}
-        for pkg in trend_analysis:
-            cat = pkg.get("category")
-            if cat:
-                trend_by_category[cat["id"]] = pkg
-
         result = []
         for cat_id, cat in flat_cats.items():
+            if cat.get("is_transfer"):
+                continue
             parent_id = cat.get("parent_id")
             parent_title = flat_cats[parent_id]["title"] if parent_id and parent_id in flat_cats else None
 
@@ -649,17 +650,6 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                         over_budget = current_period.get("over_budget", False)
                         percentage_used = current_period.get("percentage_used")
 
-            average_monthly = None
-            average_weekly = None
-            trend_pkg = trend_by_category.get(cat_id)
-            if trend_pkg:
-                trend_analysis_data = trend_pkg.get("expense") or trend_pkg.get("income")
-                if trend_analysis_data:
-                    avg = trend_analysis_data.get("average_actual_amount")
-                    if avg is not None:
-                        average_monthly = abs(avg)
-                        average_weekly = round(average_monthly / 4.33, 2)
-
             result.append({
                 "category_id": cat_id,
                 "category_title": cat.get("title"),
@@ -674,8 +664,6 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                 "over_budget": over_budget,
                 "percentage_used": percentage_used,
                 "currency": currency,
-                "average_monthly": average_monthly,
-                "average_weekly": average_weekly,
             })
 
         return result
