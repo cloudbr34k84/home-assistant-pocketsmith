@@ -377,13 +377,15 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         flat_cats = {}
         _flatten(categories, flat_cats)
 
+        # A category can have multiple budget packages (e.g. yearly + multi-year budgets).
+        # Collect all packages per category so their current-period values can be summed.
         budget_by_category = {}
         for pkg in budget:
             if not isinstance(pkg, dict):
                 continue
             cat = pkg.get("category")
             if cat:
-                budget_by_category[cat["id"]] = pkg
+                budget_by_category.setdefault(cat["id"], []).append(pkg)
 
         result = []
         for cat_id, cat in flat_cats.items():
@@ -400,24 +402,31 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             percentage_used = None
             currency = "AUD"
 
-            pkg = budget_by_category.get(cat_id)
-            if pkg:
+            for pkg in budget_by_category.get(cat_id, []):
                 analysis = pkg.get("expense") or pkg.get("income")
-                if analysis:
-                    currency = analysis.get("currency_code", "AUD").upper()
-                    current_period = next(
-                        (p for p in analysis.get("periods", []) if p.get("current")),
-                        None,
-                    )
-                    if current_period:
-                        fc = current_period.get("forecast_amount")
-                        ac = current_period.get("actual_amount")
-                        budgeted = abs(fc) if fc is not None else None
-                        actual = abs(ac) if ac is not None else None
-                        remaining = current_period.get("under_by")
-                        over_by = current_period.get("over_by")
-                        over_budget = current_period.get("over_budget", False)
-                        percentage_used = current_period.get("percentage_used")
+                if not analysis:
+                    continue
+                currency = analysis.get("currency_code", "AUD").upper()
+                current_period = next(
+                    (p for p in analysis.get("periods", []) if p.get("current")),
+                    None,
+                )
+                if not current_period:
+                    continue
+                fc = current_period.get("forecast_amount")
+                ac = current_period.get("actual_amount")
+                if fc is not None:
+                    budgeted = (budgeted or 0) + abs(fc)
+                if ac is not None:
+                    actual = (actual or 0) + abs(ac)
+
+            if budgeted is not None or actual is not None:
+                b = budgeted or 0
+                a = actual or 0
+                over_budget = a > b
+                over_by = a - b if over_budget else None
+                remaining = b - a if not over_budget else None
+                percentage_used = (a / b * 100) if b > 0 else None
 
             result.append({
                 "category_id": cat_id,
