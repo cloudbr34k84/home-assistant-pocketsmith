@@ -54,44 +54,43 @@ class PocketSmithOverBudgetBinarySensor(CoordinatorEntity, BinarySensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Over Budget"
+        return "Pocketsmith Over Budget"
 
-    @property
-    def is_on(self) -> bool:
-        """Return True if any non-transfer package is over budget."""
-        return any(
-            (pkg.get("current_period") or {}).get("over_budget") is True
-            for pkg in non_transfer_budget_packages(self.coordinator.data.get("budget", []))
-        )
-
-    @property
-    def icon(self) -> str:
-        """Return the sensor icon."""
-        over = any(
-            (pkg.get("current_period") or {}).get("over_budget") is True
-            for pkg in non_transfer_budget_packages(self.coordinator.data.get("budget", []))
-        )
-        return "mdi:alert-circle" if over else "mdi:check-circle"
-
-    @property
-    def extra_state_attributes(self) -> dict:
-        """Return details of over-budget categories."""
-        over_budget = []
+    def _over_budget_packages(self) -> list:
+        """Return details of non-transfer packages whose current period is over budget."""
+        result = []
         for pkg in non_transfer_budget_packages(self.coordinator.data.get("budget", [])):
-            period = pkg.get("current_period") or {}
-            if period.get("over_budget") is not True:
+            analysis = pkg.get("expense") or pkg.get("income")
+            current_period = next((p for p in analysis.get("periods", []) if p.get("current")), None) if analysis else None
+            if current_period is None or current_period.get("over_budget") is not True:
                 continue
             cat = pkg.get("category") or {}
-            forecast = period.get("forecast_amount")
-            actual = period.get("actual_amount")
-            over_budget.append({
+            forecast = current_period.get("forecast_amount")
+            actual = current_period.get("actual_amount")
+            result.append({
                 "category_title": cat.get("title"),
                 "parent_title": (cat.get("parent_category") or {}).get("title"),
                 "actual": abs(actual) if actual is not None else None,
                 "budgeted": abs(forecast) if forecast is not None else None,
-                "over_by": period.get("over_by"),
-                "percentage_used": period.get("percentage_used"),
+                "over_by": current_period.get("over_by"),
+                "percentage_used": current_period.get("percentage_used"),
             })
+        return result
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if any non-transfer package is over budget."""
+        return len(self._over_budget_packages()) > 0
+
+    @property
+    def icon(self) -> str:
+        """Return the sensor icon."""
+        return "mdi:alert-circle" if self._over_budget_packages() else "mdi:check-circle"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return details of over-budget categories."""
+        over_budget = self._over_budget_packages()
         return {
             "over_budget_count": len(over_budget),
             "categories": over_budget,
@@ -120,7 +119,7 @@ class PocketSmithForecastNeedsRecalculateBinarySensor(CoordinatorEntity, BinaryS
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Forecast Needs Recalculate"
+        return "Pocketsmith Forecast Needs Recalculate"
 
     @property
     def is_on(self) -> bool:
@@ -178,7 +177,7 @@ class PocketSmithHasUncategorisedBinarySensor(CoordinatorEntity, BinarySensorEnt
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Has Uncategorised"
+        return "Pocketsmith Has Uncategorised"
 
     @property
     def is_on(self) -> bool:

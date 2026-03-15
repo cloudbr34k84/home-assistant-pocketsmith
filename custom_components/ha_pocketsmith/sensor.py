@@ -72,7 +72,6 @@ async def async_setup_entry(
     sensors.append(PocketSmithBudgetRemainingSensor(coordinator))
     sensors.append(PocketSmithCategoriesOverBudgetCountSensor(coordinator))
     sensors.append(PocketSmithBudgetHealthSensor(coordinator))
-    sensors.append(PocketSmithTrendAnalysisSensor(coordinator))
     sensors.append(PocketSmithUserSensor(coordinator))
     async_add_entities(sensors)
 
@@ -110,7 +109,7 @@ class PocketSmithSensor(CoordinatorEntity, SensorEntity):
     def name(self) -> str:
         """Return the sensor name."""
         account_title = self._account.get("title", "Unnamed Account")
-        return "PocketSmith %s Balance" % account_title
+        return "Pocketsmith %s Balance" % account_title
 
     @property
     def native_value(self):
@@ -157,7 +156,7 @@ class PocketSmithUncategorisedTransactions(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Uncategorised Transactions"
+        return "Pocketsmith Uncategorised Transactions"
 
     @property
     def native_value(self):
@@ -195,12 +194,12 @@ class PocketSmithCategoriesSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Categories"
+        return "Pocketsmith Categories"
 
     @property
     def native_value(self):
         """Return the count of categories."""
-        return len(self.coordinator.data.get("categories", []))
+        return len(self.coordinator.data.get("enriched_categories", []))
 
     @property
     def icon(self) -> str:
@@ -235,18 +234,13 @@ class PocketSmithCategoriesBudgetedSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Categories Budgeted"
+        return "Pocketsmith Categories Budgeted"
 
     def _budgeted_categories(self) -> list:
-        """Return categories that have a matching entry in the budget list."""
-        budgeted_ids = {
-            pkg["category"]["id"]
-            for pkg in self.coordinator.data.get("budget", [])
-            if isinstance(pkg.get("category"), dict)
-        }
+        """Return enriched categories that have a budget (budgeted is not None)."""
         return [
-            cat for cat in self.coordinator.data.get("categories", [])
-            if cat.get("id") in budgeted_ids
+            cat for cat in self.coordinator.data.get("enriched_categories", [])
+            if cat.get("budgeted") is not None
         ]
 
     @property
@@ -262,7 +256,7 @@ class PocketSmithCategoriesBudgetedSensor(CoordinatorEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         """Return the names of budgeted categories."""
-        return {"category_names": [cat.get("title") for cat in self._budgeted_categories()]}
+        return {"category_names": [cat.get("category_title") for cat in self._budgeted_categories()]}
 
 
 class PocketSmithCategoriesUnbudgetedSensor(CoordinatorEntity, SensorEntity):
@@ -287,18 +281,13 @@ class PocketSmithCategoriesUnbudgetedSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Categories Unbudgeted"
+        return "Pocketsmith Categories Unbudgeted"
 
     def _unbudgeted_categories(self) -> list:
-        """Return categories that have no matching entry in the budget list."""
-        budgeted_ids = {
-            pkg["category"]["id"]
-            for pkg in self.coordinator.data.get("budget", [])
-            if isinstance(pkg.get("category"), dict)
-        }
+        """Return enriched categories that have no budget (budgeted is None)."""
         return [
-            cat for cat in self.coordinator.data.get("categories", [])
-            if cat.get("id") not in budgeted_ids
+            cat for cat in self.coordinator.data.get("enriched_categories", [])
+            if cat.get("budgeted") is None
         ]
 
     @property
@@ -314,7 +303,7 @@ class PocketSmithCategoriesUnbudgetedSensor(CoordinatorEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         """Return the names of unbudgeted categories."""
-        return {"category_names": [cat.get("title") for cat in self._unbudgeted_categories()]}
+        return {"category_names": [cat.get("category_title") for cat in self._unbudgeted_categories()]}
 
 
 class PocketSmithCategorySensor(CoordinatorEntity, SensorEntity):
@@ -347,17 +336,14 @@ class PocketSmithCategorySensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        e = self._enriched
-        title = e.get("category_title", self._category_slug)
-        parent_id = e.get("parent_id")
-        if parent_id:
-            parent = next(
-                (c for c in self.coordinator.data.get("categories", []) if c.get("id") == parent_id),
-                None,
-            )
-            if parent:
-                return "PocketSmith Category %s > %s" % (parent.get("title", parent_id), title)
-        return "PocketSmith Category %s" % title
+        cat = next(
+            (c for c in self.coordinator.data.get("enriched_categories", []) if c.get("category_id") == self._category_id),
+            {},
+        )
+        title = cat.get("category_title", self._category_slug)
+        if cat.get("parent_title") is not None:
+            return "Pocketsmith Category %s > %s" % (cat["parent_title"], title)
+        return "Pocketsmith Category %s" % title
 
     @property
     def native_value(self):
@@ -417,7 +403,7 @@ class PocketSmithBudgetSummarySensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Budget Summary"
+        return "Pocketsmith Budget Summary"
 
     @property
     def _summary_data(self) -> dict:
@@ -482,7 +468,7 @@ class PocketSmithNetWorthSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Net Worth"
+        return "Pocketsmith Net Worth"
 
     @property
     def native_value(self):
@@ -538,15 +524,18 @@ class PocketSmithTotalBudgetedSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Total Budgeted"
+        return "Pocketsmith Total Budgeted"
 
     @property
     def native_value(self):
         """Return sum of abs(forecast_amount) from current period across non-transfer packages."""
         total = 0.0
         for pkg in non_transfer_budget_packages(self.coordinator.data.get("budget", [])):
-            period = pkg.get("current_period") or {}
-            amount = period.get("forecast_amount")
+            analysis = pkg.get("expense") or pkg.get("income")
+            current_period = next((p for p in analysis.get("periods", []) if p.get("current")), None) if analysis else None
+            if current_period is None:
+                continue
+            amount = current_period.get("forecast_amount")
             if amount is not None:
                 total += abs(amount)
         return round(total, 2)
@@ -584,15 +573,18 @@ class PocketSmithTotalSpentSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Total Spent"
+        return "Pocketsmith Total Spent"
 
     @property
     def native_value(self):
         """Return sum of abs(actual_amount) from current period across non-transfer packages."""
         total = 0.0
         for pkg in non_transfer_budget_packages(self.coordinator.data.get("budget", [])):
-            period = pkg.get("current_period") or {}
-            amount = period.get("actual_amount")
+            analysis = pkg.get("expense") or pkg.get("income")
+            current_period = next((p for p in analysis.get("periods", []) if p.get("current")), None) if analysis else None
+            if current_period is None:
+                continue
+            amount = current_period.get("actual_amount")
             if amount is not None:
                 total += abs(amount)
         return round(total, 2)
@@ -630,7 +622,7 @@ class PocketSmithBudgetRemainingSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Budget Remaining"
+        return "Pocketsmith Budget Remaining"
 
     @property
     def native_value(self):
@@ -638,9 +630,12 @@ class PocketSmithBudgetRemainingSensor(CoordinatorEntity, SensorEntity):
         total_budgeted = 0.0
         total_spent = 0.0
         for pkg in non_transfer_budget_packages(self.coordinator.data.get("budget", [])):
-            period = pkg.get("current_period") or {}
-            forecast = period.get("forecast_amount")
-            actual = period.get("actual_amount")
+            analysis = pkg.get("expense") or pkg.get("income")
+            current_period = next((p for p in analysis.get("periods", []) if p.get("current")), None) if analysis else None
+            if current_period is None:
+                continue
+            forecast = current_period.get("forecast_amount")
+            actual = current_period.get("actual_amount")
             if forecast is not None:
                 total_budgeted += abs(forecast)
             if actual is not None:
@@ -678,15 +673,18 @@ class PocketSmithCategoriesOverBudgetCountSensor(CoordinatorEntity, SensorEntity
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Categories Over Budget Count"
+        return "Pocketsmith Categories Over Budget Count"
 
     @property
     def native_value(self):
         """Return count of non-transfer packages where the current period is over budget."""
-        return sum(
-            1 for pkg in non_transfer_budget_packages(self.coordinator.data.get("budget", []))
-            if (pkg.get("current_period") or {}).get("over_budget") is True
-        )
+        count = 0
+        for pkg in non_transfer_budget_packages(self.coordinator.data.get("budget", [])):
+            analysis = pkg.get("expense") or pkg.get("income")
+            current_period = next((p for p in analysis.get("periods", []) if p.get("current")), None) if analysis else None
+            if current_period and current_period.get("over_budget") is True:
+                count += 1
+        return count
 
     @property
     def native_unit_of_measurement(self) -> str:
@@ -732,7 +730,7 @@ class PocketSmithBudgetHealthSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith Budget Health"
+        return "Pocketsmith Budget Health"
 
     def _budget_stats(self) -> dict:
         """Return cached budget health statistics, computing if necessary."""
@@ -746,15 +744,18 @@ class PocketSmithBudgetHealthSensor(CoordinatorEntity, SensorEntity):
         healthy_count = 0
 
         for pkg in packages:
-            period = pkg.get("current_period") or {}
-            forecast = period.get("forecast_amount")
-            actual = period.get("actual_amount")
+            analysis = pkg.get("expense") or pkg.get("income")
+            current_period = next((p for p in analysis.get("periods", []) if p.get("current")), None) if analysis else None
+            if current_period is None:
+                continue
+            forecast = current_period.get("forecast_amount")
+            actual = current_period.get("actual_amount")
             if forecast is not None:
                 total_budgeted += abs(forecast)
             if actual is not None:
                 total_actual += abs(actual)
-            pct = period.get("percentage_used") or 0
-            over = period.get("over_budget") is True
+            pct = current_period.get("percentage_used") or 0
+            over = current_period.get("over_budget") is True
             if over or pct > 100:
                 cat = pkg.get("category") or {}
                 over_budget_pkgs.append({
@@ -762,7 +763,7 @@ class PocketSmithBudgetHealthSensor(CoordinatorEntity, SensorEntity):
                     "parent_title": (cat.get("parent_category") or {}).get("title"),
                     "actual": abs(actual) if actual is not None else None,
                     "budgeted": abs(forecast) if forecast is not None else None,
-                    "over_by": period.get("over_by"),
+                    "over_by": current_period.get("over_by"),
                     "percentage_used": pct,
                 })
             elif pct >= 80:
@@ -778,7 +779,7 @@ class PocketSmithBudgetHealthSensor(CoordinatorEntity, SensorEntity):
             if isinstance(pkg.get("category"), dict)
         }
         unbudgeted_count = sum(
-            1 for cat in self.coordinator.data.get("categories", [])
+            1 for cat in self.coordinator.data.get("enriched_categories", [])
             if cat.get("id") not in budgeted_ids
         )
 
@@ -833,68 +834,6 @@ class PocketSmithBudgetHealthSensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class PocketSmithTrendAnalysisSensor(CoordinatorEntity, SensorEntity):
-    """Sensor reporting the PocketSmith trend analysis package count."""
-
-    def __init__(self, coordinator: PocketSmithCoordinator) -> None:
-        """Initialise the sensor."""
-        super().__init__(coordinator)
-        self._user_id = coordinator.data["user_id"]
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return _make_device_info(self.coordinator)
-
-    @property
-    def unique_id(self) -> str:
-        """Return a unique ID for this sensor."""
-        return "pocketsmith_%s_trend_analysis" % self._user_id
-
-    @property
-    def name(self) -> str:
-        """Return the sensor name."""
-        return "PocketSmith Total Trend Spend"
-
-    @property
-    def native_value(self):
-        """Return total absolute expense spend across all trend analysis packages."""
-        total = 0.0
-        for package in self.coordinator.data.get("trend_analysis", []):
-            if not isinstance(package, dict):
-                continue
-            expense = package.get("expense")
-            if expense:
-                amount = expense.get("total_actual_amount")
-                if amount is not None:
-                    total += abs(amount)
-        return round(total, 2)
-
-    @property
-    def native_unit_of_measurement(self) -> str:
-        """Return the currency code from the first trend analysis package."""
-        packages = self.coordinator.data.get("trend_analysis", [])
-        for first in packages:
-            if not isinstance(first, dict):
-                continue
-            code = (
-                (first.get("expense") or {}).get("currency_code")
-                or (first.get("income") or {}).get("currency_code")
-                or "AUD"
-            )
-            return code.upper()
-        return "AUD"
-
-    @property
-    def icon(self) -> str:
-        """Return the sensor icon."""
-        return "mdi:chart-line"
-
-    @property
-    def extra_state_attributes(self) -> dict:
-        """Return the full trend analysis list as an attribute."""
-        return {"trend_analysis": self.coordinator.data.get("trend_analysis", [])}
-
-
 class PocketSmithUserSensor(CoordinatorEntity, SensorEntity):
     """Sensor reporting PocketSmith user profile information."""
 
@@ -910,7 +849,7 @@ class PocketSmithUserSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "PocketSmith User"
+        return "Pocketsmith User"
 
     @property
     def native_value(self):
