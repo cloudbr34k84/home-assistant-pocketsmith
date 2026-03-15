@@ -1,6 +1,5 @@
 name: Automatic Release
 
-# Trigger when a new tag is pushed that starts with 'v'
 on:
   push:
     tags:
@@ -11,21 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: read
 
     steps:
-      # Checkout the repo
       - uses: actions/checkout@v4
         with:
-          ref: main
+          fetch-depth: 0
 
-      # Use release-drafter to automatically generate and publish the release
-      # It will use the commit messages to generate the release notes
-      - uses: release-drafter/release-drafter@v6
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          # Automatically publish the release instead of saving as draft
-          publish: true
-          # Use the tag that triggered this workflow as the release tag
-          tag: ${{ github.ref_name }}
+          generate_release_notes: true
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
