@@ -23,7 +23,3 @@ jobs:
           make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-Also delete .github/release-drafter.yml as it's no longer needed.
-
-Then commit with: chore: switch to softprops release action for commit-based release notes
