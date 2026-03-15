@@ -10,7 +10,7 @@ from .const import DOMAIN
 from .coordinator import PocketSmithCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-_UPDATE_INTERVAL = timedelta(minutes=5)
+_UPDATE_INTERVAL = timedelta(hours=1)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 

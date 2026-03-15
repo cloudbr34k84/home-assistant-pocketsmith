@@ -43,10 +43,8 @@ async def async_setup_entry(
     sensors.append(PocketsmithUncategorisedTransactions(coordinator))
     sensors.append(PocketSmithCategoriesSensor(coordinator))
     sensors.extend(
-        PocketSmithBudgetSensor(coordinator, package)
-        for package in coordinator.data.get("budget", [])
-        if not package.get("is_transfer")
-        and package.get("category", {}).get("parent_id") is None
+        PocketSmithCategorySensor(coordinator, enriched_category)
+        for enriched_category in coordinator.data.get("enriched_categories", [])
     )
     sensors.append(PocketSmithBudgetSummarySensor(coordinator))
     sensors.append(PocketSmithTrendAnalysisSensor(coordinator))
@@ -183,103 +181,76 @@ class PocketSmithCategoriesSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
-        """Return the full categories list as an attribute."""
-        return {"categories": self.coordinator.data.get("categories", [])}
+        """Return an empty dict — category data is now exposed via PocketSmithCategorySensor."""
+        return {}
 
 
-class PocketSmithBudgetSensor(CoordinatorEntity, SensorEntity):
-    """Sensor representing a single PocketSmith budget analysis package."""
+class PocketSmithCategorySensor(CoordinatorEntity, SensorEntity):
+    """Sensor representing a single enriched PocketSmith category."""
 
-    def __init__(self, coordinator: PocketSmithCoordinator, package: dict) -> None:
+    def __init__(self, coordinator: PocketSmithCoordinator, enriched_category: dict) -> None:
         """Initialise the sensor."""
         super().__init__(coordinator)
-        category = package["category"]
-        self._category_id = category["id"]
-        self._category_slug = category["title"].replace(" ", "_").lower()
+        self._category_id = enriched_category["category_id"]
+        import re
+        raw_slug = enriched_category.get("category_title", "").lower().replace(" ", "_")
+        self._category_slug = re.sub(r"[^\w]", "", raw_slug)
 
     @property
-    def _package(self) -> dict:
-        """Return the current package from coordinator data by category id."""
-        for pkg in self.coordinator.data.get("budget", []):
-            if pkg.get("category", {}).get("id") == self._category_id:
-                return pkg
+    def _enriched(self) -> dict:
+        """Return the current enriched category from coordinator data."""
+        for cat in self.coordinator.data.get("enriched_categories", []):
+            if cat.get("category_id") == self._category_id:
+                return cat
         return {}
 
     @property
     def unique_id(self) -> str:
         """Return a stable unique ID for this sensor."""
-        return "pocketsmith_%s_%s_budget" % (self._category_id, self._category_slug)
+        return "pocketsmith_category_%s_%s" % (self._category_id, self._category_slug)
 
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        title = self._package.get("category", {}).get("title", self._category_slug)
-        return "PocketSmith Budget %s" % title
-
-    def _current_period(self) -> dict:
-        """Return the period where current is True, from expense then income analysis."""
-        analysis = self._package.get("expense") or self._package.get("income")
-        if analysis:
-            for period in analysis.get("periods", []):
-                if period.get("current"):
-                    return period
-        return {}
+        return "PocketSmith Category %s" % self._enriched.get("category_title", self._category_slug)
 
     @property
     def native_value(self):
-        """Return the actual amount for the current period."""
-        period = self._current_period()
-        if period:
-            amount = period.get("actual_amount")
-            if amount is not None:
-                return abs(amount)
-        analysis = self._package.get("expense") or self._package.get("income")
-        if analysis:
-            total = analysis.get("total_actual_amount")
-            if total is not None:
-                return abs(total)
-        return None
+        """Return the actual spend for the current period, or 0 if not available."""
+        actual = self._enriched.get("actual")
+        return actual if actual is not None else 0
 
     @property
     def native_unit_of_measurement(self) -> str:
-        """Return the currency code from the expense or income analysis."""
-        expense = self._package.get("expense")
-        if expense:
-            return expense.get("currency_code", "USD").upper()
-        income = self._package.get("income")
-        if income:
-            return income.get("currency_code", "USD").upper()
-        return "USD"
+        """Return the currency code."""
+        return self._enriched.get("currency", "AUD")
 
     @property
     def icon(self) -> str:
-        """Return the sensor icon based on whether the current period is over budget."""
-        period = self._current_period()
-        if period.get("over_budget"):
+        """Return the sensor icon based on whether the category is over budget."""
+        if self._enriched.get("over_budget"):
             return "mdi:cash-remove"
         return "mdi:cash-check"
 
     @property
     def extra_state_attributes(self) -> dict:
-        """Return budget period details as attributes."""
-        category = self._package.get("category", {})
-        period = self._current_period()
-        if not period:
-            return {
-                "category_id": category.get("id"),
-                "category_title": category.get("title"),
-            }
-        analysis = self._package.get("expense") or self._package.get("income")
+        """Return enriched category details as attributes."""
+        e = self._enriched
         return {
-            "budgeted": abs(period["forecast_amount"]) if period.get("forecast_amount") is not None else None,
-            "actual": abs(period["actual_amount"]) if period.get("actual_amount") is not None else None,
-            "remaining": period.get("under_by"),
-            "over_by": period.get("over_by"),
-            "over_budget": period.get("over_budget"),
-            "percentage_used": period.get("percentage_used"),
-            "currency": analysis.get("currency_code", "USD").upper() if analysis else "USD",
-            "category_id": category.get("id"),
-            "category_title": category.get("title"),
+            "category_id": e.get("category_id"),
+            "category_title": e.get("category_title"),
+            "parent_id": e.get("parent_id"),
+            "parent_title": e.get("parent_title"),
+            "is_bill": e.get("is_bill"),
+            "budgeted": e.get("budgeted"),
+            "actual": e.get("actual"),
+            "remaining": e.get("remaining"),
+            "over_by": e.get("over_by"),
+            "over_budget": e.get("over_budget"),
+            "percentage_used": e.get("percentage_used"),
+            "average_weekly": e.get("average_weekly"),
+            "average_monthly": e.get("average_monthly"),
+            "currency": e.get("currency"),
         }
 
 
@@ -362,6 +333,8 @@ class PocketSmithTrendAnalysisSensor(CoordinatorEntity, SensorEntity):
         """Return total absolute expense spend across all trend analysis packages."""
         total = 0.0
         for package in self.coordinator.data.get("trend_analysis", []):
+            if not isinstance(package, dict):
+                continue
             expense = package.get("expense")
             if expense:
                 amount = expense.get("total_actual_amount")
@@ -373,8 +346,9 @@ class PocketSmithTrendAnalysisSensor(CoordinatorEntity, SensorEntity):
     def native_unit_of_measurement(self) -> str:
         """Return the currency code from the first trend analysis package."""
         packages = self.coordinator.data.get("trend_analysis", [])
-        if packages:
-            first = packages[0]
+        for first in packages:
+            if not isinstance(first, dict):
+                continue
             code = (
                 (first.get("expense") or {}).get("currency_code")
                 or (first.get("income") or {}).get("currency_code")

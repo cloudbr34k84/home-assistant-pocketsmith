@@ -17,5 +17,21 @@
     "abort": {
       "already_configured": "PocketSmith is already configured."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "PocketSmith Options",
+        "description": "Configure how PocketSmith analyses your budget data.",
+        "data": {
+          "period": "Reporting Period",
+          "interval": "Period Interval"
+        },
+        "data_description": {
+          "period": "The time period to use for budget analysis — weeks, months or years.",
+          "interval": "How many periods to group together, e.g. interval 2 with months = fortnightly."
+        }
+      }
+    }
   }
 }

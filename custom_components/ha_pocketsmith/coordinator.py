@@ -67,6 +67,8 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                 "PocketSmith API request timed out. Check your network connection."
             ) from err
 
+        enriched_categories = self._build_enriched_categories(categories, budget, trend_analysis)
+
         return {
             "user_id": user_id,
             "accounts": accounts,
@@ -75,6 +77,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             "budget": budget,
             "budget_summary": budget_summary,
             "trend_analysis": trend_analysis,
+            "enriched_categories": enriched_categories,
         }
 
     async def _fetch_user_id(self, session: aiohttp.ClientSession) -> int:
@@ -590,3 +593,89 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
 
         _LOGGER.debug("Fetched trend analysis for user %s (via suggested alternative period)", user_id)
         return trend_analysis
+
+    def _build_enriched_categories(self, categories: list, budget: list, trend_analysis: list) -> list:
+        """Return a flat enriched list of all categories with budget and trend data."""
+
+        def _flatten(cats, flat):
+            for cat in cats:
+                flat[cat["id"]] = cat
+                _flatten(cat.get("children") or [], flat)
+
+        flat_cats = {}
+        _flatten(categories, flat_cats)
+
+        budget_by_category = {}
+        for pkg in budget:
+            cat = pkg.get("category")
+            if cat:
+                budget_by_category[cat["id"]] = pkg
+
+        trend_by_category = {}
+        for pkg in trend_analysis:
+            cat = pkg.get("category")
+            if cat:
+                trend_by_category[cat["id"]] = pkg
+
+        result = []
+        for cat_id, cat in flat_cats.items():
+            parent_id = cat.get("parent_id")
+            parent_title = flat_cats[parent_id]["title"] if parent_id and parent_id in flat_cats else None
+
+            budgeted = None
+            actual = None
+            remaining = None
+            over_by = None
+            over_budget = False
+            percentage_used = None
+            currency = "AUD"
+
+            pkg = budget_by_category.get(cat_id)
+            if pkg:
+                analysis = pkg.get("expense") or pkg.get("income")
+                if analysis:
+                    currency = analysis.get("currency_code", "AUD").upper()
+                    current_period = next(
+                        (p for p in analysis.get("periods", []) if p.get("current")),
+                        None,
+                    )
+                    if current_period:
+                        fc = current_period.get("forecast_amount")
+                        ac = current_period.get("actual_amount")
+                        budgeted = abs(fc) if fc is not None else None
+                        actual = abs(ac) if ac is not None else None
+                        remaining = current_period.get("under_by")
+                        over_by = current_period.get("over_by")
+                        over_budget = current_period.get("over_budget", False)
+                        percentage_used = current_period.get("percentage_used")
+
+            average_monthly = None
+            average_weekly = None
+            trend_pkg = trend_by_category.get(cat_id)
+            if trend_pkg:
+                trend_analysis_data = trend_pkg.get("expense") or trend_pkg.get("income")
+                if trend_analysis_data:
+                    avg = trend_analysis_data.get("average_actual_amount")
+                    if avg is not None:
+                        average_monthly = abs(avg)
+                        average_weekly = round(average_monthly / 4.33, 2)
+
+            result.append({
+                "category_id": cat_id,
+                "category_title": cat.get("title"),
+                "parent_id": parent_id,
+                "parent_title": parent_title,
+                "is_bill": cat.get("is_bill"),
+                "is_transfer": cat.get("is_transfer"),
+                "budgeted": budgeted,
+                "actual": actual,
+                "remaining": remaining,
+                "over_by": over_by,
+                "over_budget": over_budget,
+                "percentage_used": percentage_used,
+                "currency": currency,
+                "average_monthly": average_monthly,
+                "average_weekly": average_weekly,
+            })
+
+        return result
