@@ -59,7 +59,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             uncategorised_count = await self._fetch_uncategorised_count(session, user_id)
             categories = await self._fetch_categories(session, user_id)
             budget = await self._fetch_budget(session, user_id)
-            monthly_transactions = await self._fetch_monthly_transactions(session, user_id)
+            monthly_transactions, monthly_transaction_counts = await self._fetch_monthly_transactions(session, user_id)
             monthly_events = await self._fetch_monthly_events(session, user_id)
         except aiohttp.ClientError as err:
             raise UpdateFailed(
@@ -70,7 +70,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                 "PocketSmith API request timed out. Check your network connection."
             ) from err
 
-        enriched_categories = self._build_enriched_categories(categories, budget, monthly_transactions, monthly_events)
+        enriched_categories = self._build_enriched_categories(categories, budget, monthly_transactions, monthly_events, monthly_transaction_counts)
 
         return {
             "user_id": user_id,
@@ -80,6 +80,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             "categories": categories,
             "budget": budget,
             "monthly_transactions": monthly_transactions,
+            "monthly_transaction_counts": monthly_transaction_counts,
             "monthly_events": monthly_events,
             "enriched_categories": enriched_categories,
             "forecast_last_updated": dt_util.utcnow(),
@@ -372,8 +373,8 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         _LOGGER.debug("Fetched budget for user %s", user_id)
         return budget
 
-    async def _fetch_monthly_transactions(self, session: aiohttp.ClientSession, user_id: int) -> dict:
-        """Return actual spend totals grouped by category ID for the current month."""
+    async def _fetch_monthly_transactions(self, session: aiohttp.ClientSession, user_id: int) -> tuple[dict, dict]:
+        """Return actual spend totals and transaction counts grouped by category ID for the current month."""
         today = date.today()
         start_date = date(today.year, today.month, 1).isoformat()
         last_day = calendar.monthrange(today.year, today.month)[1]
@@ -387,6 +388,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         base_url = "%s/users/%s/transactions" % (_API_BASE, user_id)
         url = "%s?start_date=%s&end_date=%s&per_page=1000" % (base_url, start_date, end_date)
         totals: dict[int, float] = {}
+        counts: dict[int, int] = {}
         transaction_count = 0
 
         while url:
@@ -447,6 +449,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                 cat_id = category.get("id")
                 amount = t.get("amount", 0)
                 totals[cat_id] = totals.get(cat_id, 0) + abs(amount)
+                counts[cat_id] = counts.get(cat_id, 0) + 1
                 transaction_count += 1
 
             url = next_url
@@ -455,7 +458,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             "Fetched %s monthly transactions across %s categories for user %s",
             transaction_count, len(totals), user_id,
         )
-        return totals
+        return totals, counts
 
     async def _fetch_monthly_events(self, session: aiohttp.ClientSession, user_id: int) -> dict:
         """Return budgeted amount totals grouped by category ID for the current month."""
@@ -533,7 +536,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         )
         return totals
 
-    def _build_enriched_categories(self, categories: list, budget: list, monthly_transactions: dict, monthly_events: dict) -> list:
+    def _build_enriched_categories(self, categories: list, budget: list, monthly_transactions: dict, monthly_events: dict, monthly_transaction_counts: dict) -> list:
         """Return a flat enriched list of all categories with monthly budget data.
 
         For each non-transfer category:
@@ -580,6 +583,10 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             # Actual: sourced from monthly transactions
             actual = monthly_transactions.get(cat_id)
 
+            # Default actual to 0 for categories that have budget data
+            if actual is None and cat_id in budget_by_category:
+                actual = 0
+
             # Budgeted: depends on whether this is a bill category
             if cat.get("is_bill"):
                 budgeted = monthly_events.get(cat_id)
@@ -623,9 +630,9 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                 b = budgeted or 0
                 a = actual or 0
                 over_budget = a > b
-                over_by = a - b if over_budget else None
-                remaining = b - a if not over_budget else None
-                percentage_used = (a / b * 100) if b > 0 else None
+                over_by = a - b if over_budget else 0
+                remaining = b - a if not over_budget else 0
+                percentage_used = round(a / b * 100, 2) if b > 0 else None
 
             result.append({
                 "category_id": cat_id,
@@ -641,6 +648,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                 "over_budget": over_budget,
                 "percentage_used": percentage_used,
                 "currency": currency,
+                "transaction_count": monthly_transaction_counts.get(cat_id, 0),
             })
 
         return result

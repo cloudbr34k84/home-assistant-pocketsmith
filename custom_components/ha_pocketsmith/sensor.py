@@ -282,6 +282,7 @@ class PocketSmithCategorySensor(CoordinatorEntity, SensorEntity):
             "over_budget": e.get("over_budget"),
             "percentage_used": e.get("percentage_used"),
             "currency": e.get("currency"),
+            "transaction_count": e.get("transaction_count"),
         }
 
 
