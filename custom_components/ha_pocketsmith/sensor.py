@@ -343,6 +343,12 @@ class PocketSmithUserSensor(CoordinatorEntity, SensorEntity):
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return _make_device_info(self.coordinator)
+
     @property
     def unique_id(self) -> str:
         """Return a unique ID for this sensor."""

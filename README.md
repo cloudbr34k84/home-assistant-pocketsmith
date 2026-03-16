@@ -12,7 +12,7 @@
 
 - Live balance sensors for every account linked to your PocketSmith profile
 - A net worth sensor summing all account balances
-- Per-category spending sensors with budget vs. actual tracking
+- Per-category spending sensors with monthly budget vs. actual tracking (pro-rated for non-bill categories, event-based for bill categories)
 - Uncategorised transaction count so nothing slips through the cracks
 - Binary sensors that alert you when you are over budget or have uncategorised transactions
 - A user profile sensor with account metadata
@@ -167,12 +167,12 @@ Reports the total number of spending/income categories (excluding transfer categ
 
 ### Per-category sensors
 
-One sensor is created for each non-transfer category in your PocketSmith account, enriched with budget data for the current period.
+One sensor is created for each non-transfer category in your PocketSmith account, enriched with budget data scoped to the current calendar month.
 
 | Property | Value |
 |---|---|
 | Entity ID pattern | `sensor.<category_name>` |
-| State | Actual spend in the current period (numeric, `0` if no data) |
+| State | Actual spend for the current calendar month (numeric, `0` if no data) |
 | Unit | Category currency code |
 | Icon | `mdi:cash-check` (on budget) / `mdi:cash-remove` (over budget) |
 
@@ -185,12 +185,13 @@ One sensor is created for each non-transfer category in your PocketSmith account
 | `parent_id` | Parent category ID (if nested) |
 | `parent_title` | Parent category name (if nested) |
 | `is_bill` | `true` if marked as a bill in PocketSmith |
-| `budgeted` | Budgeted amount for the current period |
-| `actual` | Actual spend for the current period |
-| `remaining` | Amount remaining under budget (`under_by`) |
-| `over_by` | Amount over budget (if applicable) |
+| `budgeted` | Budgeted amount for the current month. For non-bill categories this is pro-rated from the budget period to the calendar month. For bill categories this is the sum of bills scheduled this month. |
+| `actual` | Actual spend from transactions this calendar month (`0` if no transactions) |
+| `remaining` | Amount remaining under budget (`0` if over budget) |
+| `over_by` | Amount over budget (`0` if under budget) |
 | `over_budget` | `true` / `false` |
-| `percentage_used` | Percentage of budget consumed |
+| `percentage_used` | Percentage of budget consumed (rounded to 2 decimal places) |
+| `transaction_count` | Number of transactions in this category for the current month |
 | `currency` | Currency code |
 
 ---
@@ -213,7 +214,7 @@ Reports the authenticated user's display name and exposes profile metadata as at
 
 ### Pocketsmith Over Budget
 
-Turns **on** (problem) when one or more non-transfer budget categories have exceeded their budget in the current period.
+Turns **on** (problem) when one or more non-transfer budget categories have exceeded their monthly budget.
 
 | Property | Value |
 |---|---|
