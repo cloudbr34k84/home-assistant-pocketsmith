@@ -1,13 +1,15 @@
 """DataUpdateCoordinator for PocketSmith."""
 import asyncio
+import calendar
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 
@@ -57,6 +59,8 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             uncategorised_count = await self._fetch_uncategorised_count(session, user_id)
             categories = await self._fetch_categories(session, user_id)
             budget = await self._fetch_budget(session, user_id)
+            monthly_transactions = await self._fetch_monthly_transactions(session, user_id)
+            monthly_events = await self._fetch_monthly_events(session, user_id)
         except aiohttp.ClientError as err:
             raise UpdateFailed(
                 "Unable to reach the PocketSmith API. Check your network connection."
@@ -66,7 +70,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                 "PocketSmith API request timed out. Check your network connection."
             ) from err
 
-        enriched_categories = self._build_enriched_categories(categories, budget)
+        enriched_categories = self._build_enriched_categories(categories, budget, monthly_transactions, monthly_events)
 
         return {
             "user_id": user_id,
@@ -75,8 +79,10 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             "uncategorised_count": uncategorised_count,
             "categories": categories,
             "budget": budget,
+            "monthly_transactions": monthly_transactions,
+            "monthly_events": monthly_events,
             "enriched_categories": enriched_categories,
-            "forecast_last_updated": datetime.now(timezone.utc),
+            "forecast_last_updated": dt_util.utcnow(),
         }
 
     async def _fetch_user_id(self, session: aiohttp.ClientSession) -> int:
@@ -366,8 +372,176 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         _LOGGER.debug("Fetched budget for user %s", user_id)
         return budget
 
-    def _build_enriched_categories(self, categories: list, budget: list) -> list:
-        """Return a flat enriched list of all categories with budget data."""
+    async def _fetch_monthly_transactions(self, session: aiohttp.ClientSession, user_id: int) -> dict:
+        """Return actual spend totals grouped by category ID for the current month."""
+        today = date.today()
+        start_date = date(today.year, today.month, 1).isoformat()
+        last_day = calendar.monthrange(today.year, today.month)[1]
+        end_date = date(today.year, today.month, last_day).isoformat()
+
+        _LOGGER.debug(
+            "Fetching monthly transactions for user %s (%s to %s)",
+            user_id, start_date, end_date,
+        )
+
+        base_url = "%s/users/%s/transactions" % (_API_BASE, user_id)
+        url = "%s?start_date=%s&end_date=%s&per_page=1000" % (base_url, start_date, end_date)
+        totals: dict[int, float] = {}
+        transaction_count = 0
+
+        while url:
+            next_url = None
+
+            async with asyncio.timeout(_REQUEST_TIMEOUT):
+                async with session.get(url, headers=self._headers) as response:
+                    if response.status == 400:
+                        try:
+                            error_body = (await response.json()).get("error", "unknown error")
+                        except Exception:
+                            error_body = "unknown error"
+                        raise UpdateFailed(
+                            "PocketSmith returned a bad request error: %s. This may indicate a bug in the integration." % error_body
+                        )
+                    if response.status == 401:
+                        raise UpdateFailed(
+                            "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
+                            "Reconfigure the integration to fix this."
+                        )
+                    if response.status == 403:
+                        raise UpdateFailed(
+                            "PocketSmith access denied — your developer key lacks the required permissions "
+                            "to read your transactions."
+                        )
+                    if response.status == 404:
+                        raise UpdateFailed(
+                            "PocketSmith could not find your transaction data. This may be a temporary API issue."
+                        )
+                    if response.status == 405:
+                        raise UpdateFailed(
+                            "PocketSmith returned Method Not Allowed (HTTP 405). This is likely a bug in the integration — please report it."
+                        )
+                    if response.status == 429:
+                        raise UpdateFailed(
+                            "PocketSmith API rate limit exceeded. The integration will retry on the next update."
+                        )
+                    if response.status == 503:
+                        raise UpdateFailed(
+                            "PocketSmith is temporarily unavailable for maintenance (HTTP 503). The integration will retry on the next update."
+                        )
+                    if response.status >= 500:
+                        raise UpdateFailed(
+                            "PocketSmith is experiencing server issues (HTTP %s). "
+                            "Data will refresh when the service recovers." % response.status
+                        )
+                    response.raise_for_status()
+                    transactions = await response.json()
+                    next_url = _parse_link_next(response.headers.get("Link", ""))
+
+            if not transactions:
+                break
+
+            for t in transactions:
+                category = t.get("category")
+                if category is None:
+                    continue
+                cat_id = category.get("id")
+                amount = t.get("amount", 0)
+                totals[cat_id] = totals.get(cat_id, 0) + abs(amount)
+                transaction_count += 1
+
+            url = next_url
+
+        _LOGGER.debug(
+            "Fetched %s monthly transactions across %s categories for user %s",
+            transaction_count, len(totals), user_id,
+        )
+        return totals
+
+    async def _fetch_monthly_events(self, session: aiohttp.ClientSession, user_id: int) -> dict:
+        """Return budgeted amount totals grouped by category ID for the current month."""
+        today = date.today()
+        start_date = date(today.year, today.month, 1).isoformat()
+        last_day = calendar.monthrange(today.year, today.month)[1]
+        end_date = date(today.year, today.month, last_day).isoformat()
+
+        _LOGGER.debug(
+            "Fetching monthly events for user %s (%s to %s)",
+            user_id, start_date, end_date,
+        )
+
+        url = "%s/users/%s/events?start_date=%s&end_date=%s" % (_API_BASE, user_id, start_date, end_date)
+
+        async with asyncio.timeout(_REQUEST_TIMEOUT):
+            async with session.get(url, headers=self._headers) as response:
+                if response.status == 400:
+                    try:
+                        error_body = (await response.json()).get("error", "unknown error")
+                    except Exception:
+                        error_body = "unknown error"
+                    raise UpdateFailed(
+                        "PocketSmith returned a bad request error: %s. This may indicate a bug in the integration." % error_body
+                    )
+                if response.status == 401:
+                    raise UpdateFailed(
+                        "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
+                        "Reconfigure the integration to fix this."
+                    )
+                if response.status == 403:
+                    raise UpdateFailed(
+                        "PocketSmith access denied — your developer key lacks the required permissions "
+                        "to read your events."
+                    )
+                if response.status == 404:
+                    raise UpdateFailed(
+                        "PocketSmith could not find your event data. This may be a temporary API issue."
+                    )
+                if response.status == 405:
+                    raise UpdateFailed(
+                        "PocketSmith returned Method Not Allowed (HTTP 405). This is likely a bug in the integration — please report it."
+                    )
+                if response.status == 429:
+                    raise UpdateFailed(
+                        "PocketSmith API rate limit exceeded. The integration will retry on the next update."
+                    )
+                if response.status == 503:
+                    raise UpdateFailed(
+                        "PocketSmith is temporarily unavailable for maintenance (HTTP 503). The integration will retry on the next update."
+                    )
+                if response.status >= 500:
+                    raise UpdateFailed(
+                        "PocketSmith is experiencing server issues (HTTP %s). "
+                        "Data will refresh when the service recovers." % response.status
+                    )
+                response.raise_for_status()
+                events = await response.json()
+
+        totals: dict[int, float] = {}
+        event_count = 0
+
+        for e in events:
+            category = e.get("category")
+            if category is None:
+                continue
+            cat_id = category.get("id")
+            amount = e.get("amount", 0)
+            totals[cat_id] = totals.get(cat_id, 0) + abs(amount)
+            event_count += 1
+
+        _LOGGER.debug(
+            "Fetched %s monthly events across %s categories for user %s",
+            event_count, len(totals), user_id,
+        )
+        return totals
+
+    def _build_enriched_categories(self, categories: list, budget: list, monthly_transactions: dict, monthly_events: dict) -> list:
+        """Return a flat enriched list of all categories with monthly budget data.
+
+        For each non-transfer category:
+        - actual: sourced from monthly_transactions (sum of real transactions this calendar month)
+        - budgeted (non-bill categories): pro-rated from the budget API's forecast_amount to the current month
+          Formula: abs(forecast_amount) / period_days * days_in_current_month, summed across all budget packages
+        - budgeted (bill categories): sourced from monthly_events (sum of scheduled events this calendar month)
+        """
 
         def _flatten(cats, flat):
             for cat in cats:
@@ -377,8 +551,6 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         flat_cats = {}
         _flatten(categories, flat_cats)
 
-        # A category can have multiple budget packages (e.g. yearly + multi-year budgets).
-        # Collect all packages per category so their current-period values can be summed.
         budget_by_category = {}
         for pkg in budget:
             if not isinstance(pkg, dict):
@@ -386,6 +558,9 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             cat = pkg.get("category")
             if cat:
                 budget_by_category.setdefault(cat["id"], []).append(pkg)
+
+        today = date.today()
+        days_in_month = calendar.monthrange(today.year, today.month)[1]
 
         result = []
         for cat_id, cat in flat_cats.items():
@@ -402,23 +577,47 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             percentage_used = None
             currency = "AUD"
 
-            for pkg in budget_by_category.get(cat_id, []):
-                analysis = pkg.get("expense") or pkg.get("income")
-                if not analysis:
-                    continue
-                currency = analysis.get("currency_code", "AUD").upper()
-                current_period = next(
-                    (p for p in analysis.get("periods", []) if p.get("current")),
-                    None,
-                )
-                if not current_period:
-                    continue
-                fc = current_period.get("forecast_amount")
-                ac = current_period.get("actual_amount")
-                if fc is not None:
-                    budgeted = (budgeted or 0) + abs(fc)
-                if ac is not None:
-                    actual = (actual or 0) + abs(ac)
+            # Actual: sourced from monthly transactions
+            actual = monthly_transactions.get(cat_id)
+
+            # Budgeted: depends on whether this is a bill category
+            if cat.get("is_bill"):
+                budgeted = monthly_events.get(cat_id)
+            else:
+                for pkg in budget_by_category.get(cat_id, []):
+                    analysis = pkg.get("expense") or pkg.get("income")
+                    if not analysis:
+                        continue
+                    currency = analysis.get("currency_code", "AUD").upper()
+                    current_period = next(
+                        (p for p in analysis.get("periods", []) if p.get("current")),
+                        None,
+                    )
+                    if not current_period:
+                        continue
+                    fc = current_period.get("forecast_amount")
+                    if fc is None:
+                        continue
+                    try:
+                        p_start = date.fromisoformat(current_period["start_date"])
+                        p_end = date.fromisoformat(current_period["end_date"])
+                        period_days = (p_end - p_start).days + 1
+                    except (KeyError, ValueError, TypeError):
+                        continue
+                    if period_days <= 0:
+                        continue
+                    budgeted = (budgeted or 0) + abs(fc) / period_days * days_in_month
+
+            # Extract currency from budget packages for bill categories too
+            if cat.get("is_bill"):
+                for pkg in budget_by_category.get(cat_id, []):
+                    analysis = pkg.get("expense") or pkg.get("income")
+                    if analysis:
+                        currency = analysis.get("currency_code", "AUD").upper()
+                        break
+
+            if budgeted is not None:
+                budgeted = round(budgeted, 2)
 
             if budgeted is not None or actual is not None:
                 b = budgeted or 0

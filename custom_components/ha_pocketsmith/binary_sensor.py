@@ -11,7 +11,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .coordinator import PocketSmithCoordinator
-from .helpers import non_transfer_budget_packages
+
 from .sensor import _make_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -59,23 +59,18 @@ class PocketSmithOverBudgetBinarySensor(CoordinatorEntity, BinarySensorEntity):
         return "Pocketsmith Over Budget"
 
     def _over_budget_packages(self) -> list:
-        """Return details of non-transfer packages whose current period is over budget."""
+        """Return details of categories that are over budget this month."""
         result = []
-        for pkg in non_transfer_budget_packages(self.coordinator.data.get("budget", [])):
-            analysis = pkg.get("expense") or pkg.get("income")
-            current_period = next((p for p in analysis.get("periods", []) if p.get("current")), None) if analysis else None
-            if current_period is None or current_period.get("over_budget") is not True:
+        for cat in self.coordinator.data.get("enriched_categories", []):
+            if not cat.get("over_budget"):
                 continue
-            cat = pkg.get("category") or {}
-            forecast = current_period.get("forecast_amount")
-            actual = current_period.get("actual_amount")
             result.append({
-                "category_title": cat.get("title"),
-                "parent_title": (cat.get("parent_category") or {}).get("title"),
-                "actual": abs(actual) if actual is not None else None,
-                "budgeted": abs(forecast) if forecast is not None else None,
-                "over_by": current_period.get("over_by"),
-                "percentage_used": current_period.get("percentage_used"),
+                "category_title": cat.get("category_title"),
+                "parent_title": cat.get("parent_title"),
+                "actual": cat.get("actual"),
+                "budgeted": cat.get("budgeted"),
+                "over_by": cat.get("over_by"),
+                "percentage_used": cat.get("percentage_used"),
             })
         return result
 
