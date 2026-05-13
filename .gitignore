@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 release_workflow.md
 release_workflow_template.md
+home-assistant-pocketsmith/.claude
