@@ -472,67 +472,76 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             user_id, start_date, end_date,
         )
 
-        url = "%s/users/%s/events?start_date=%s&end_date=%s" % (_API_BASE, user_id, start_date, end_date)
-
-        async with asyncio.timeout(_REQUEST_TIMEOUT):
-            async with session.get(url, headers=self._headers) as response:
-                if response.status == 400:
-                    try:
-                        error_body = (await response.json()).get("error", "unknown error")
-                    except Exception:
-                        error_body = "unknown error"
-                    raise UpdateFailed(
-                        "PocketSmith returned a bad request error: %s. This may indicate a bug in the integration." % error_body
-                    )
-                if response.status == 401:
-                    raise UpdateFailed(
-                        "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
-                        "Reconfigure the integration to fix this."
-                    )
-                if response.status == 403:
-                    raise UpdateFailed(
-                        "PocketSmith access denied — your developer key lacks the required permissions "
-                        "to read your events."
-                    )
-                if response.status == 404:
-                    raise UpdateFailed(
-                        "PocketSmith could not find your event data. This may be a temporary API issue."
-                    )
-                if response.status == 405:
-                    raise UpdateFailed(
-                        "PocketSmith returned Method Not Allowed (HTTP 405). This is likely a bug in the integration — please report it."
-                    )
-                if response.status == 429:
-                    raise UpdateFailed(
-                        "PocketSmith API rate limit exceeded. The integration will retry on the next update."
-                    )
-                if response.status == 503:
-                    raise UpdateFailed(
-                        "PocketSmith is temporarily unavailable for maintenance (HTTP 503). The integration will retry on the next update."
-                    )
-                if response.status >= 500:
-                    raise UpdateFailed(
-                        "PocketSmith is experiencing server issues (HTTP %s). "
-                        "Data will refresh when the service recovers." % response.status
-                    )
-                response.raise_for_status()
-                events = await response.json()
+        url = "%s/users/%s/events?start_date=%s&end_date=%s&per_page=1000" % (_API_BASE, user_id, start_date, end_date)
 
         totals: dict[int, float] = {}
         event_count = 0
 
-        for e in events:
-            category = e.get("category")
-            if category is None:
-                continue
-            cat_id = category.get("id")
-            amount = e.get("amount", 0)
-            totals[cat_id] = totals.get(cat_id, 0) + abs(amount)
-            event_count += 1
+        while url:
+            next_url = None
+
+            async with asyncio.timeout(_REQUEST_TIMEOUT):
+                async with session.get(url, headers=self._headers) as response:
+                    if response.status == 400:
+                        try:
+                            error_body = (await response.json()).get("error", "unknown error")
+                        except Exception:
+                            error_body = "unknown error"
+                        raise UpdateFailed(
+                            "PocketSmith returned a bad request error: %s. This may indicate a bug in the integration." % error_body
+                        )
+                    if response.status == 401:
+                        raise UpdateFailed(
+                            "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
+                            "Reconfigure the integration to fix this."
+                        )
+                    if response.status == 403:
+                        raise UpdateFailed(
+                            "PocketSmith access denied — your developer key lacks the required permissions "
+                            "to read your events."
+                        )
+                    if response.status == 404:
+                        raise UpdateFailed(
+                            "PocketSmith could not find your event data. This may be a temporary API issue."
+                        )
+                    if response.status == 405:
+                        raise UpdateFailed(
+                            "PocketSmith returned Method Not Allowed (HTTP 405). This is likely a bug in the integration — please report it."
+                        )
+                    if response.status == 429:
+                        raise UpdateFailed(
+                            "PocketSmith API rate limit exceeded. The integration will retry on the next update."
+                        )
+                    if response.status == 503:
+                        raise UpdateFailed(
+                            "PocketSmith is temporarily unavailable for maintenance (HTTP 503). The integration will retry on the next update."
+                        )
+                    if response.status >= 500:
+                        raise UpdateFailed(
+                            "PocketSmith is experiencing server issues (HTTP %s). "
+                            "Data will refresh when the service recovers." % response.status
+                        )
+                    response.raise_for_status()
+                    events = await response.json()
+                    next_url = _parse_link_next(response.headers.get("Link", ""))
+
+            if not events:
+                break
+
+            for e in events:
+                category = e.get("category")
+                if category is None:
+                    continue
+                cat_id = category.get("id")
+                amount = e.get("amount", 0)
+                totals[cat_id] = totals.get(cat_id, 0) + abs(amount)
+                event_count += 1
+
+            url = next_url
 
         _LOGGER.debug(
-            "Fetched %s monthly events across %s categories for user %s",
-            event_count, len(totals), user_id,
+            "Fetched %s monthly events across %s categories for user %s. Category IDs with events: %s",
+            event_count, len(totals), user_id, sorted(totals.keys()),
         )
         return totals
 
@@ -590,10 +599,26 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             # Budgeted: depends on whether this is a bill category
             if cat.get("is_bill"):
                 budgeted = monthly_events.get(cat_id)
+                if budgeted is None:
+                    _LOGGER.debug(
+                        "Bill category '%s' (id=%s) has no event in current month. "
+                        "Event category IDs available: %s",
+                        cat.get("title"), cat_id, sorted(monthly_events.keys()),
+                    )
             else:
-                for pkg in budget_by_category.get(cat_id, []):
+                pkgs = budget_by_category.get(cat_id, [])
+                if not pkgs:
+                    _LOGGER.debug(
+                        "Category '%s' (id=%s) has no budget packages",
+                        cat.get("title"), cat_id,
+                    )
+                for pkg in pkgs:
                     analysis = pkg.get("expense") or pkg.get("income")
                     if not analysis:
+                        _LOGGER.debug(
+                            "Category '%s' (id=%s) budget package has no expense/income data",
+                            cat.get("title"), cat_id,
+                        )
                         continue
                     currency = analysis.get("currency_code", "AUD").upper()
                     current_period = next(
@@ -601,6 +626,12 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                         None,
                     )
                     if not current_period:
+                        period_dates = [(p.get("start_date"), p.get("end_date")) for p in analysis.get("periods", [])]
+                        _LOGGER.debug(
+                            "Category '%s' (id=%s) has %d budget package(s) but no current period. "
+                            "Available periods: %s",
+                            cat.get("title"), cat_id, len(pkgs), period_dates,
+                        )
                         continue
                     fc = current_period.get("forecast_amount")
                     if fc is None:
