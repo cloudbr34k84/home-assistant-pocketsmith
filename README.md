@@ -2,7 +2,7 @@
 
 # PocketSmith Integration for Home Assistant
 
-![PocketSmith Home Assistant Integration](https://raw.githubusercontent.com/cloudbr34k84/home-assistant-pocketsmith/main/brand/icon.png)
+![PocketSmith Home Assistant Integration](https://raw.githubusercontent.com/cloudbr34k84/home-assistant-pocketsmith/main/custom_components/ha_pocketsmith/brand/icon.png)
 
 ## Overview
 
