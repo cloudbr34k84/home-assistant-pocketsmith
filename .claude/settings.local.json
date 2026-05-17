@@ -7,7 +7,13 @@
       "Bash(git tag:*)",
       "Bash(git push:*)",
       "Bash(git commit:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Skill(aurora:aurora)",
+      "Bash(gh release *)"
     ]
+  },
+  "enabledPlugins": {
+    "home-assistant-skills@home-assistant-skills": true,
+    "aurora@aurora-smart-home": true
   }
 }
