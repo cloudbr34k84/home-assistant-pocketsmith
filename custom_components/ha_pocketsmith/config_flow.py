@@ -132,3 +132,35 @@ class PocketSmithConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema({vol.Required("developer_key"): str}),
             errors=errors,
         )
+
+    async def async_step_reconfigure(self, user_input=None):
+        """Allow the user to update their developer key from the 3-dot menu."""
+        errors = {}
+        if user_input is not None:
+            try:
+                await _validate_developer_key(self.hass, user_input["developer_key"])
+            except ValueError as err:
+                errors["base"] = str(err)
+            except aiohttp.ClientError:
+                errors["base"] = "cannot_connect"
+            except asyncio.TimeoutError:
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected error during PocketSmith reconfigure")
+                errors["base"] = "unknown"
+            else:
+                self.hass.config_entries.async_update_entry(
+                    self._get_reconfigure_entry(),
+                    data={"developer_key": user_input["developer_key"]},
+                )
+                await self.hass.config_entries.async_reload(self._get_reconfigure_entry().entry_id)
+                return self.async_abort(reason="reconfigure_successful")
+
+        entry = self._get_reconfigure_entry()
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema({
+                vol.Required("developer_key", default=entry.data.get("developer_key", "")): str,
+            }),
+            errors=errors,
+        )

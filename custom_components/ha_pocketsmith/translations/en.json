@@ -17,6 +17,16 @@
         "data": {
           "developer_key": "Developer Key"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure PocketSmith",
+        "description": "Update your PocketSmith developer key. Your existing entity history will be preserved.",
+        "data": {
+          "developer_key": "Developer Key"
+        },
+        "data_description": {
+          "developer_key": "Your PocketSmith developer API key. Find it in PocketSmith under Settings → API → Developer Keys."
+        }
       }
     },
     "error": {
@@ -27,7 +37,8 @@
     },
     "abort": {
       "already_configured": "PocketSmith is already configured.",
-      "reauth_successful": "Re-authentication was successful."
+      "reauth_successful": "Re-authentication was successful.",
+      "reconfigure_successful": "Developer key updated successfully."
     }
   },
   "options": {
@@ -77,6 +88,11 @@
       },
       "reset_backfill": {
         "name": "Reset Backfill"
+      }
+    },
+    "number": {
+      "polling_interval": {
+        "name": "Polling Interval"
       }
     }
   },

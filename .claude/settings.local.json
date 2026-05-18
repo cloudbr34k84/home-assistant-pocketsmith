@@ -33,7 +33,10 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(grep -n \"Invalid statistic_id\" /tmp/core/homeassistant/components/recorder/statistics.py)",
-      "Read(//tmp/core/homeassistant/components/recorder/**)"
+      "Read(//tmp/core/homeassistant/components/recorder/**)",
+      "Bash(git -C /homeassistant/brads_dev/home-assistant-pocketsmith log --oneline -10)",
+      "Bash(git -C /homeassistant/brads_dev/home-assistant-pocketsmith tag --sort=-v:refname)",
+      "Bash(git -C /homeassistant/brads_dev/home-assistant-pocketsmith status)"
     ]
   },
   "enabledPlugins": {

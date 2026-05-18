@@ -1,0 +1,17 @@
+refresh:
+  name: Refresh
+  description: Force an immediate data refresh from PocketSmith without waiting for the next scheduled poll.
+
+reset_backfill:
+  name: Reset backfill
+  description: >
+    Clear the historical backfill progress marker so that all accounts are
+    re-swept on the next startup. Use this if a backfill failed or you want
+    to re-import historical statistics from scratch.
+
+get_budget_summary:
+  name: Get budget summary
+  description: >
+    Return the current budget summary as structured data. Suitable for use
+    in automations — the response includes over-budget categories, total
+    category count, uncategorised transaction count, and net worth.
