@@ -7,6 +7,7 @@ from datetime import date
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -17,6 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 
 _API_BASE = "https://api.pocketsmith.com/v2"
 _REQUEST_TIMEOUT = 10
+_MAX_RETRY_AFTER = 300  # Never sleep more than 5 minutes on a 429
 
 
 def _parse_link_next(link_header: str):
@@ -28,6 +30,56 @@ def _parse_link_next(link_header: str):
             if start != -1 and end != -1:
                 return part[start + 1:end]
     return None
+
+
+async def _raise_for_api_error(response: aiohttp.ClientResponse, context: str) -> None:
+    """Raise the appropriate exception for a non-2xx PocketSmith API response."""
+    if response.status == 400:
+        try:
+            error_body = (await response.json()).get("error", "unknown error")
+        except Exception:
+            error_body = "unknown error"
+        raise UpdateFailed(
+            "PocketSmith returned a bad request error fetching %s: %s" % (context, error_body)
+        )
+    if response.status == 401:
+        raise ConfigEntryAuthFailed("PocketSmith developer key is invalid or has been revoked")
+    if response.status == 403:
+        raise UpdateFailed(
+            "PocketSmith access denied fetching %s — developer key lacks required permissions" % context
+        )
+    if response.status == 404:
+        raise UpdateFailed(
+            "PocketSmith could not find %s data — this may be a temporary API issue" % context
+        )
+    if response.status == 405:
+        raise UpdateFailed(
+            "PocketSmith returned Method Not Allowed (HTTP 405) fetching %s — please report this bug" % context
+        )
+    if response.status == 429:
+        retry_after_raw = response.headers.get("Retry-After", "")
+        try:
+            retry_after = min(float(retry_after_raw), _MAX_RETRY_AFTER)
+        except (ValueError, TypeError):
+            retry_after = 60.0
+        _LOGGER.warning(
+            "PocketSmith rate limit hit fetching %s — sleeping %ss before failing update",
+            context, retry_after,
+        )
+        await asyncio.sleep(retry_after)
+        raise UpdateFailed(
+            "PocketSmith API rate limit exceeded fetching %s — will retry on next update" % context
+        )
+    if response.status == 503:
+        raise UpdateFailed(
+            "PocketSmith is temporarily unavailable (HTTP 503) — will retry on next update"
+        )
+    if response.status >= 500:
+        raise UpdateFailed(
+            "PocketSmith server error (HTTP %s) fetching %s — will retry when service recovers"
+            % (response.status, context)
+        )
+    response.raise_for_status()
 
 
 class PocketSmithCoordinator(DataUpdateCoordinator):
@@ -48,6 +100,18 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             "Accept": "application/json",
             "Authorization": "Key %s" % developer_key,
         }
+        # Limit to one in-flight request at a time to avoid burst rate limiting.
+        self._request_semaphore = asyncio.Semaphore(1)
+
+    async def _get(self, session: aiohttp.ClientSession, url: str, context: str):
+        """Make a rate-limited GET request and return the parsed JSON response and Link header."""
+        async with self._request_semaphore:
+            async with asyncio.timeout(_REQUEST_TIMEOUT):
+                async with session.get(url, headers=self._headers) as response:
+                    await _raise_for_api_error(response, context)
+                    data = await response.json()
+                    link = response.headers.get("Link", "")
+        return data, link
 
     async def _async_update_data(self) -> dict:
         """Fetch user, accounts, and uncategorised transaction count."""
@@ -89,46 +153,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
     async def _fetch_user_id(self, session: aiohttp.ClientSession) -> int:
         """Return the authenticated user's ID."""
         url = "%s/me" % _API_BASE
-
-        async with asyncio.timeout(_REQUEST_TIMEOUT):
-            async with session.get(url, headers=self._headers) as response:
-                if response.status == 400:
-                    try:
-                        error_body = (await response.json()).get("error", "unknown error")
-                    except Exception:
-                        error_body = "unknown error"
-                    raise UpdateFailed(
-                        "PocketSmith returned a bad request error: %s. This may indicate a bug in the integration." % error_body
-                    )
-                if response.status == 401:
-                    raise UpdateFailed(
-                        "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
-                        "Reconfigure the integration to fix this."
-                    )
-                if response.status == 403:
-                    raise UpdateFailed(
-                        "PocketSmith access denied — your developer key lacks the required permissions "
-                        "to read your account data."
-                    )
-                if response.status == 405:
-                    raise UpdateFailed(
-                        "PocketSmith returned Method Not Allowed (HTTP 405). This is likely a bug in the integration — please report it."
-                    )
-                if response.status == 429:
-                    raise UpdateFailed(
-                        "PocketSmith API rate limit exceeded. The integration will retry on the next update."
-                    )
-                if response.status == 503:
-                    raise UpdateFailed(
-                        "PocketSmith is temporarily unavailable for maintenance (HTTP 503). The integration will retry on the next update."
-                    )
-                if response.status >= 500:
-                    raise UpdateFailed(
-                        "PocketSmith is experiencing server issues (HTTP %s). "
-                        "Data will refresh when the service recovers." % response.status
-                    )
-                response.raise_for_status()
-                data = await response.json()
+        data, _ = await self._get(session, url, "user profile")
 
         user_id = data.get("id")
         if user_id is None:
@@ -143,51 +168,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
     async def _fetch_accounts(self, session: aiohttp.ClientSession, user_id: int) -> list:
         """Return all accounts for the given user."""
         url = "%s/users/%s/accounts" % (_API_BASE, user_id)
-
-        async with asyncio.timeout(_REQUEST_TIMEOUT):
-            async with session.get(url, headers=self._headers) as response:
-                if response.status == 400:
-                    try:
-                        error_body = (await response.json()).get("error", "unknown error")
-                    except Exception:
-                        error_body = "unknown error"
-                    raise UpdateFailed(
-                        "PocketSmith returned a bad request error: %s. This may indicate a bug in the integration." % error_body
-                    )
-                if response.status == 401:
-                    raise UpdateFailed(
-                        "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
-                        "Reconfigure the integration to fix this."
-                    )
-                if response.status == 403:
-                    raise UpdateFailed(
-                        "PocketSmith access denied — your developer key lacks the required permissions "
-                        "to read your accounts."
-                    )
-                if response.status == 404:
-                    raise UpdateFailed(
-                        "PocketSmith could not find your account data. This may be a temporary API issue."
-                    )
-                if response.status == 405:
-                    raise UpdateFailed(
-                        "PocketSmith returned Method Not Allowed (HTTP 405). This is likely a bug in the integration — please report it."
-                    )
-                if response.status == 429:
-                    raise UpdateFailed(
-                        "PocketSmith API rate limit exceeded. The integration will retry on the next update."
-                    )
-                if response.status == 503:
-                    raise UpdateFailed(
-                        "PocketSmith is temporarily unavailable for maintenance (HTTP 503). The integration will retry on the next update."
-                    )
-                if response.status >= 500:
-                    raise UpdateFailed(
-                        "PocketSmith is experiencing server issues (HTTP %s). "
-                        "Data will refresh when the service recovers." % response.status
-                    )
-                response.raise_for_status()
-                accounts = await response.json()
-
+        accounts, _ = await self._get(session, url, "accounts")
         _LOGGER.debug("Fetched %s accounts for user %s", len(accounts), user_id)
         return accounts
 
@@ -198,59 +179,12 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         url = "%s?uncategorised=1&per_page=1000" % base_url
 
         while url:
-            next_url = None
-
-            async with asyncio.timeout(_REQUEST_TIMEOUT):
-                async with session.get(url, headers=self._headers) as response:
-                    if response.status == 400:
-                        try:
-                            error_body = (await response.json()).get("error", "unknown error")
-                        except Exception:
-                            error_body = "unknown error"
-                        raise UpdateFailed(
-                            "PocketSmith returned a bad request error: %s. This may indicate a bug in the integration." % error_body
-                        )
-                    if response.status == 401:
-                        raise UpdateFailed(
-                            "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
-                            "Reconfigure the integration to fix this."
-                        )
-                    if response.status == 403:
-                        raise UpdateFailed(
-                            "PocketSmith access denied — your developer key lacks the required permissions "
-                            "to read your transactions."
-                        )
-                    if response.status == 404:
-                        raise UpdateFailed(
-                            "PocketSmith could not find your transaction data. This may be a temporary API issue."
-                        )
-                    if response.status == 405:
-                        raise UpdateFailed(
-                            "PocketSmith returned Method Not Allowed (HTTP 405). This is likely a bug in the integration — please report it."
-                        )
-                    if response.status == 429:
-                        raise UpdateFailed(
-                            "PocketSmith API rate limit exceeded. The integration will retry on the next update."
-                        )
-                    if response.status == 503:
-                        raise UpdateFailed(
-                            "PocketSmith is temporarily unavailable for maintenance (HTTP 503). The integration will retry on the next update."
-                        )
-                    if response.status >= 500:
-                        raise UpdateFailed(
-                            "PocketSmith is experiencing server issues (HTTP %s). "
-                            "Data will refresh when the service recovers." % response.status
-                        )
-                    response.raise_for_status()
-                    transactions = await response.json()
-                    next_url = _parse_link_next(response.headers.get("Link", ""))
-
+            transactions, link = await self._get(session, url, "uncategorised transactions")
             if not transactions:
                 break
-
             count += sum(1 for t in transactions if t.get("category") is None)
             _LOGGER.debug("Fetched %s transactions for this page", len(transactions))
-            url = next_url
+            url = _parse_link_next(link)
 
         _LOGGER.debug("Total uncategorised transactions for user %s: %s", user_id, count)
         return count
@@ -261,55 +195,9 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         categories = []
 
         while url:
-            next_url = None
-
-            async with asyncio.timeout(_REQUEST_TIMEOUT):
-                async with session.get(url, headers=self._headers) as response:
-                    if response.status == 400:
-                        try:
-                            error_body = (await response.json()).get("error", "unknown error")
-                        except Exception:
-                            error_body = "unknown error"
-                        raise UpdateFailed(
-                            "PocketSmith returned a bad request error: %s. This may indicate a bug in the integration." % error_body
-                        )
-                    if response.status == 401:
-                        raise UpdateFailed(
-                            "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
-                            "Reconfigure the integration to fix this."
-                        )
-                    if response.status == 403:
-                        raise UpdateFailed(
-                            "PocketSmith access denied — your developer key lacks the required permissions "
-                            "to read your categories."
-                        )
-                    if response.status == 404:
-                        raise UpdateFailed(
-                            "PocketSmith could not find your category data. This may be a temporary API issue."
-                        )
-                    if response.status == 405:
-                        raise UpdateFailed(
-                            "PocketSmith returned Method Not Allowed (HTTP 405). This is likely a bug in the integration — please report it."
-                        )
-                    if response.status == 429:
-                        raise UpdateFailed(
-                            "PocketSmith API rate limit exceeded. The integration will retry on the next update."
-                        )
-                    if response.status == 503:
-                        raise UpdateFailed(
-                            "PocketSmith is temporarily unavailable for maintenance (HTTP 503). The integration will retry on the next update."
-                        )
-                    if response.status >= 500:
-                        raise UpdateFailed(
-                            "PocketSmith is experiencing server issues (HTTP %s). "
-                            "Data will refresh when the service recovers." % response.status
-                        )
-                    response.raise_for_status()
-                    page_categories = await response.json()
-                    next_url = _parse_link_next(response.headers.get("Link", ""))
-
+            page_categories, link = await self._get(session, url, "categories")
             categories.extend(page_categories)
-            url = next_url
+            url = _parse_link_next(link)
 
         _LOGGER.debug("Fetched %s categories for user %s", len(categories), user_id)
         return categories
@@ -320,62 +208,16 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         budget = []
 
         while url:
-            next_url = None
-
-            async with asyncio.timeout(_REQUEST_TIMEOUT):
-                async with session.get(url, headers=self._headers) as response:
-                    if response.status == 400:
-                        try:
-                            error_body = (await response.json()).get("error", "unknown error")
-                        except Exception:
-                            error_body = "unknown error"
-                        raise UpdateFailed(
-                            "PocketSmith returned a bad request error: %s. This may indicate a bug in the integration." % error_body
-                        )
-                    if response.status == 401:
-                        raise UpdateFailed(
-                            "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
-                            "Reconfigure the integration to fix this."
-                        )
-                    if response.status == 403:
-                        raise UpdateFailed(
-                            "PocketSmith access denied — your developer key lacks the required permissions "
-                            "to read your budget."
-                        )
-                    if response.status == 404:
-                        raise UpdateFailed(
-                            "PocketSmith could not find your budget data. This may be a temporary API issue."
-                        )
-                    if response.status == 405:
-                        raise UpdateFailed(
-                            "PocketSmith returned Method Not Allowed (HTTP 405). This is likely a bug in the integration — please report it."
-                        )
-                    if response.status == 429:
-                        raise UpdateFailed(
-                            "PocketSmith API rate limit exceeded. The integration will retry on the next update."
-                        )
-                    if response.status == 503:
-                        raise UpdateFailed(
-                            "PocketSmith is temporarily unavailable for maintenance (HTTP 503). The integration will retry on the next update."
-                        )
-                    if response.status >= 500:
-                        raise UpdateFailed(
-                            "PocketSmith is experiencing server issues (HTTP %s). "
-                            "Data will refresh when the service recovers." % response.status
-                        )
-                    response.raise_for_status()
-                    page_budget = await response.json()
-                    next_url = _parse_link_next(response.headers.get("Link", ""))
-
+            page_budget, link = await self._get(session, url, "budget")
             budget.extend(page_budget)
-            url = next_url
+            url = _parse_link_next(link)
 
         _LOGGER.debug("Fetched budget for user %s", user_id)
         return budget
 
     async def _fetch_monthly_transactions(self, session: aiohttp.ClientSession, user_id: int) -> tuple[dict, dict]:
         """Return actual spend totals and transaction counts grouped by category ID for the current month."""
-        today = date.today()
+        today = dt_util.now().date()
         start_date = date(today.year, today.month, 1).isoformat()
         last_day = calendar.monthrange(today.year, today.month)[1]
         end_date = date(today.year, today.month, last_day).isoformat()
@@ -392,53 +234,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         transaction_count = 0
 
         while url:
-            next_url = None
-
-            async with asyncio.timeout(_REQUEST_TIMEOUT):
-                async with session.get(url, headers=self._headers) as response:
-                    if response.status == 400:
-                        try:
-                            error_body = (await response.json()).get("error", "unknown error")
-                        except Exception:
-                            error_body = "unknown error"
-                        raise UpdateFailed(
-                            "PocketSmith returned a bad request error: %s. This may indicate a bug in the integration." % error_body
-                        )
-                    if response.status == 401:
-                        raise UpdateFailed(
-                            "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
-                            "Reconfigure the integration to fix this."
-                        )
-                    if response.status == 403:
-                        raise UpdateFailed(
-                            "PocketSmith access denied — your developer key lacks the required permissions "
-                            "to read your transactions."
-                        )
-                    if response.status == 404:
-                        raise UpdateFailed(
-                            "PocketSmith could not find your transaction data. This may be a temporary API issue."
-                        )
-                    if response.status == 405:
-                        raise UpdateFailed(
-                            "PocketSmith returned Method Not Allowed (HTTP 405). This is likely a bug in the integration — please report it."
-                        )
-                    if response.status == 429:
-                        raise UpdateFailed(
-                            "PocketSmith API rate limit exceeded. The integration will retry on the next update."
-                        )
-                    if response.status == 503:
-                        raise UpdateFailed(
-                            "PocketSmith is temporarily unavailable for maintenance (HTTP 503). The integration will retry on the next update."
-                        )
-                    if response.status >= 500:
-                        raise UpdateFailed(
-                            "PocketSmith is experiencing server issues (HTTP %s). "
-                            "Data will refresh when the service recovers." % response.status
-                        )
-                    response.raise_for_status()
-                    transactions = await response.json()
-                    next_url = _parse_link_next(response.headers.get("Link", ""))
-
+            transactions, link = await self._get(session, url, "monthly transactions")
             if not transactions:
                 break
 
@@ -452,7 +248,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                 counts[cat_id] = counts.get(cat_id, 0) + 1
                 transaction_count += 1
 
-            url = next_url
+            url = _parse_link_next(link)
 
         _LOGGER.debug(
             "Fetched %s monthly transactions across %s categories for user %s",
@@ -462,7 +258,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
 
     async def _fetch_monthly_events(self, session: aiohttp.ClientSession, user_id: int) -> dict:
         """Return budgeted amount totals grouped by category ID for the current month."""
-        today = date.today()
+        today = dt_util.now().date()
         start_date = date(today.year, today.month, 1).isoformat()
         last_day = calendar.monthrange(today.year, today.month)[1]
         end_date = date(today.year, today.month, last_day).isoformat()
@@ -478,53 +274,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         event_count = 0
 
         while url:
-            next_url = None
-
-            async with asyncio.timeout(_REQUEST_TIMEOUT):
-                async with session.get(url, headers=self._headers) as response:
-                    if response.status == 400:
-                        try:
-                            error_body = (await response.json()).get("error", "unknown error")
-                        except Exception:
-                            error_body = "unknown error"
-                        raise UpdateFailed(
-                            "PocketSmith returned a bad request error: %s. This may indicate a bug in the integration." % error_body
-                        )
-                    if response.status == 401:
-                        raise UpdateFailed(
-                            "PocketSmith authentication failed — your developer key is invalid or has been revoked. "
-                            "Reconfigure the integration to fix this."
-                        )
-                    if response.status == 403:
-                        raise UpdateFailed(
-                            "PocketSmith access denied — your developer key lacks the required permissions "
-                            "to read your events."
-                        )
-                    if response.status == 404:
-                        raise UpdateFailed(
-                            "PocketSmith could not find your event data. This may be a temporary API issue."
-                        )
-                    if response.status == 405:
-                        raise UpdateFailed(
-                            "PocketSmith returned Method Not Allowed (HTTP 405). This is likely a bug in the integration — please report it."
-                        )
-                    if response.status == 429:
-                        raise UpdateFailed(
-                            "PocketSmith API rate limit exceeded. The integration will retry on the next update."
-                        )
-                    if response.status == 503:
-                        raise UpdateFailed(
-                            "PocketSmith is temporarily unavailable for maintenance (HTTP 503). The integration will retry on the next update."
-                        )
-                    if response.status >= 500:
-                        raise UpdateFailed(
-                            "PocketSmith is experiencing server issues (HTTP %s). "
-                            "Data will refresh when the service recovers." % response.status
-                        )
-                    response.raise_for_status()
-                    events = await response.json()
-                    next_url = _parse_link_next(response.headers.get("Link", ""))
-
+            events, link = await self._get(session, url, "monthly events")
             if not events:
                 break
 
@@ -537,7 +287,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                 totals[cat_id] = totals.get(cat_id, 0) + abs(amount)
                 event_count += 1
 
-            url = next_url
+            url = _parse_link_next(link)
 
         _LOGGER.debug(
             "Fetched %s monthly events across %s categories for user %s. Category IDs with events: %s",
@@ -571,7 +321,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             if cat:
                 budget_by_category.setdefault(cat["id"], []).append(pkg)
 
-        today = date.today()
+        today = dt_util.now().date()
         days_in_month = calendar.monthrange(today.year, today.month)[1]
 
         result = []
@@ -589,14 +339,11 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             percentage_used = None
             currency = "AUD"
 
-            # Actual: sourced from monthly transactions
             actual = monthly_transactions.get(cat_id)
 
-            # Default actual to 0 for categories that have budget data
             if actual is None and cat_id in budget_by_category:
                 actual = 0
 
-            # Budgeted: depends on whether this is a bill category
             if cat.get("is_bill"):
                 budgeted = monthly_events.get(cat_id)
                 if budgeted is None:
@@ -646,7 +393,6 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                         continue
                     budgeted = (budgeted or 0) + abs(fc) / period_days * days_in_month
 
-            # Extract currency from budget packages for bill categories too
             if cat.get("is_bill"):
                 for pkg in budget_by_category.get(cat_id, []):
                     analysis = pkg.get("expense") or pkg.get("income")

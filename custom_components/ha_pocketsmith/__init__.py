@@ -19,6 +19,18 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 type PocketSmithConfigEntry = ConfigEntry[PocketSmithCoordinator]
 
 
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate old config entry versions to the current schema."""
+    _LOGGER.debug("Migrating PocketSmith config entry from version %s.%s", entry.version, entry.minor_version)
+
+    if entry.version == 1:
+        # v1 → v2: no data changes; version bump establishes migration scaffold.
+        hass.config_entries.async_update_entry(entry, version=2, minor_version=1)
+        _LOGGER.info("Migrated PocketSmith config entry to version 2.1")
+
+    return True
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: PocketSmithConfigEntry) -> bool:
     """Set up PocketSmith from a config entry."""
     coordinator = PocketSmithCoordinator(

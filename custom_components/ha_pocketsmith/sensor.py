@@ -102,7 +102,7 @@ class PocketSmithSensor(CoordinatorEntity, SensorEntity):
     def name(self) -> str:
         """Return the sensor name."""
         account_title = self._account.get("title", "Unnamed Account")
-        return "Pocketsmith %s Balance" % account_title
+        return "%s Balance" % account_title
 
     @property
     def native_value(self):
@@ -151,7 +151,7 @@ class PocketSmithUncategorisedTransactions(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "Pocketsmith Uncategorised Transactions"
+        return "Uncategorised Transactions"
 
     @property
     def native_value(self):
@@ -191,7 +191,7 @@ class PocketSmithCategoriesSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "Pocketsmith Categories"
+        return "Categories"
 
     @property
     def native_value(self):
@@ -217,6 +217,8 @@ class PocketSmithCategorySensor(CoordinatorEntity, SensorEntity):
     """Sensor representing a single enriched PocketSmith category."""
 
     _attr_has_entity_name = True
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_state_class = SensorStateClass.TOTAL
 
     def __init__(self, coordinator: PocketSmithCoordinator, enriched_category: dict) -> None:
         """Initialise the sensor."""
@@ -290,12 +292,13 @@ class PocketSmithNetWorthSensor(CoordinatorEntity, SensorEntity):
     """Sensor reporting the total net worth across all accounts."""
 
     _attr_has_entity_name = True
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_state_class = SensorStateClass.TOTAL
 
     def __init__(self, coordinator: PocketSmithCoordinator) -> None:
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
-        self._attr_state_class = SensorStateClass.TOTAL
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -310,7 +313,7 @@ class PocketSmithNetWorthSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "Pocketsmith Net Worth"
+        return "Net Worth"
 
     @property
     def native_value(self):
@@ -357,7 +360,7 @@ class PocketSmithUserSensor(CoordinatorEntity, SensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "Pocketsmith User"
+        return "User"
 
     @property
     def native_value(self):

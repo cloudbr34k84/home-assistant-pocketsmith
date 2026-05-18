@@ -1,6 +1,5 @@
 """PocketSmith binary sensor platform."""
 import logging
-from datetime import datetime, timezone
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -56,38 +55,38 @@ class PocketSmithOverBudgetBinarySensor(CoordinatorEntity, BinarySensorEntity):
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "Pocketsmith Over Budget"
+        return "Over Budget"
 
+    @property
     def _over_budget_packages(self) -> list:
         """Return details of categories that are over budget this month."""
-        result = []
-        for cat in self.coordinator.data.get("enriched_categories", []):
-            if not cat.get("over_budget"):
-                continue
-            result.append({
+        return [
+            {
                 "category_title": cat.get("category_title"),
                 "parent_title": cat.get("parent_title"),
                 "actual": cat.get("actual"),
                 "budgeted": cat.get("budgeted"),
                 "over_by": cat.get("over_by"),
                 "percentage_used": cat.get("percentage_used"),
-            })
-        return result
+            }
+            for cat in self.coordinator.data.get("enriched_categories", [])
+            if cat.get("over_budget")
+        ]
 
     @property
     def is_on(self) -> bool:
         """Return True if any non-transfer package is over budget."""
-        return len(self._over_budget_packages()) > 0
+        return len(self._over_budget_packages) > 0
 
     @property
     def icon(self) -> str:
         """Return the sensor icon."""
-        return "mdi:alert-circle" if self._over_budget_packages() else "mdi:check-circle"
+        return "mdi:alert-circle" if self._over_budget_packages else "mdi:check-circle"
 
     @property
     def extra_state_attributes(self) -> dict:
         """Return details of over-budget categories."""
-        over_budget = self._over_budget_packages()
+        over_budget = self._over_budget_packages
         return {
             "over_budget_count": len(over_budget),
             "categories": over_budget,
@@ -117,7 +116,7 @@ class PocketSmithForecastNeedsRecalculateBinarySensor(CoordinatorEntity, BinaryS
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "Pocketsmith Forecast Needs Recalculate"
+        return "Forecast Needs Recalculate"
 
     @property
     def is_on(self) -> bool:
@@ -125,15 +124,7 @@ class PocketSmithForecastNeedsRecalculateBinarySensor(CoordinatorEntity, BinaryS
         last_updated = self.coordinator.data.get("forecast_last_updated")
         if last_updated is None:
             return True
-        if isinstance(last_updated, str):
-            try:
-                last_updated = datetime.fromisoformat(last_updated)
-            except ValueError:
-                return True
-        if last_updated.tzinfo is None:
-            last_updated = last_updated.replace(tzinfo=timezone.utc)
-        age = dt_util.utcnow() - last_updated
-        return age.total_seconds() > 86400
+        return (dt_util.utcnow() - last_updated).total_seconds() > 86400
 
     @property
     def icon(self) -> str:
@@ -141,13 +132,6 @@ class PocketSmithForecastNeedsRecalculateBinarySensor(CoordinatorEntity, BinaryS
         last_updated = self.coordinator.data.get("forecast_last_updated")
         if last_updated is None:
             return "mdi:refresh-circle"
-        if isinstance(last_updated, str):
-            try:
-                last_updated = datetime.fromisoformat(last_updated)
-            except ValueError:
-                return "mdi:refresh-circle"
-        if last_updated.tzinfo is None:
-            last_updated = last_updated.replace(tzinfo=timezone.utc)
         stale = (dt_util.utcnow() - last_updated).total_seconds() > 86400
         return "mdi:refresh-circle" if stale else "mdi:check-circle"
 
@@ -176,7 +160,7 @@ class PocketSmithHasUncategorisedBinarySensor(CoordinatorEntity, BinarySensorEnt
     @property
     def name(self) -> str:
         """Return the sensor name."""
-        return "Pocketsmith Has Uncategorised"
+        return "Has Uncategorised"
 
     @property
     def is_on(self) -> bool:

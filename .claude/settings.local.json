@@ -9,7 +9,10 @@
       "Bash(git commit:*)",
       "Bash(git stash:*)",
       "Skill(aurora:aurora)",
-      "Bash(gh release *)"
+      "Bash(gh release *)",
+      "Skill(aurora:HA-Integration-Dev)",
+      "Skill(aurora:HA-Integration-Dev:*)",
+      "Bash(python3 -c ' *)"
     ]
   },
   "enabledPlugins": {
