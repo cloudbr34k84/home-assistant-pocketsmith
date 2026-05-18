@@ -1,5 +1,4 @@
 """Shared PocketSmith API helpers used by both coordinator and statistics."""
-import asyncio
 import logging
 
 import aiohttp
@@ -55,10 +54,9 @@ async def raise_for_api_error(response: aiohttp.ClientResponse, context: str) ->
         except (ValueError, TypeError):
             retry_after = 60.0
         _LOGGER.warning(
-            "PocketSmith rate limit hit fetching %s — sleeping %ss before failing update",
+            "PocketSmith rate limit hit fetching %s — retry after %ss",
             context, retry_after,
         )
-        await asyncio.sleep(retry_after)
         raise UpdateFailed(
             "PocketSmith API rate limit exceeded fetching %s — will retry on next update" % context
         )

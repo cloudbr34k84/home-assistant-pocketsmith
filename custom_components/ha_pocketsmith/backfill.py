@@ -46,7 +46,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .api import API_BASE, parse_link_next, raise_for_api_error
-from .const import CONF_ENABLE_BACKFILL, DEFAULT_ENABLE_BACKFILL, DOMAIN
+from .const import CONF_ENABLE_BACKFILL, DEFAULT_CURRENCY, DEFAULT_ENABLE_BACKFILL, DOMAIN
 from .statistics import (
     _account_statistic_id,
     _category_statistic_id,
@@ -115,7 +115,7 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
         if acc.get("current_balance") is not None
     }
     account_currencies: dict[int, str] = {
-        acc["id"]: (acc.get("currency_code") or "AUD").upper()
+        acc["id"]: (acc.get("currency_code") or DEFAULT_CURRENCY).upper()
         for acc in accounts
     }
     account_titles: dict[int, str] = {
@@ -180,7 +180,7 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
     for account_id, daily_nets in account_daily_nets.items():
         title = account_titles.get(account_id, str(account_id))
         title_slug = title.replace(" ", "_").lower()
-        currency = account_currencies.get(account_id, "AUD")
+        currency = account_currencies.get(account_id, DEFAULT_CURRENCY)
         current_balance = account_current_balances.get(account_id, 0.0)
         statistic_id = _account_statistic_id(account_id, title_slug)
 
@@ -192,6 +192,7 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
                 "name": "%s Balance" % title,
                 "source": DOMAIN,
                 "statistic_id": statistic_id,
+                "unit_class": None,
                 "unit_of_measurement": currency,
             }
             async_add_external_statistics(hass, metadata, rows)
@@ -208,7 +209,7 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
             account_daily_nets, account_current_balances, today
         )
         if nw_rows:
-            currency = (accounts[0].get("currency_code") or "AUD").upper() if accounts else "AUD"
+            currency = (accounts[0].get("currency_code") or DEFAULT_CURRENCY).upper() if accounts else DEFAULT_CURRENCY
             async_add_external_statistics(
                 hass,
                 {
@@ -217,6 +218,7 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
                     "name": "Net Worth",
                     "source": DOMAIN,
                     "statistic_id": _net_worth_statistic_id(user_id),
+                    "unit_class": None,
                     "unit_of_measurement": currency,
                 },
                 nw_rows,
@@ -502,5 +504,5 @@ def _resolve_category_currency(cat_id: int, data: dict) -> str:
     """Pull currency from enriched_categories for this cat_id, fallback AUD."""
     for ec in data.get("enriched_categories", []):
         if ec.get("category_id") == cat_id:
-            return (ec.get("currency") or "AUD").upper()
-    return "AUD"
+            return (ec.get("currency") or DEFAULT_CURRENCY).upper()
+    return DEFAULT_CURRENCY

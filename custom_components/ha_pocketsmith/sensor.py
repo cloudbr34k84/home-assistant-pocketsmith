@@ -10,7 +10,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DEFAULT_CURRENCY, DOMAIN
 from .coordinator import PocketSmithCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ async def async_setup_entry(
             category_id=cat_id,
             category_title=cat_by_id[cat_id].get("category_title", ""),
             category_level=cat_by_id[cat_id].get("category_level", 1),
-            currency=(cat_by_id[cat_id].get("currency") or "AUD").upper(),
+            currency=(cat_by_id[cat_id].get("currency") or DEFAULT_CURRENCY).upper(),
         )
         for cat_id in parent_ids
         if cat_id in cat_by_id
@@ -105,10 +105,7 @@ class PocketSmithSensor(CoordinatorEntity, SensorEntity):
         account_title = account.get("title", "Unnamed Account")
         self._account_title_slug = account_title.replace(" ", "_").lower()
         self.entity_description = ACCOUNT_BALANCE_DESCRIPTION
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return _make_device_info(self.coordinator)
+        self._attr_device_info = _make_device_info(self.coordinator)
 
     @property
     def _account(self) -> dict:
@@ -163,10 +160,7 @@ class PocketSmithUncategorisedTransactions(CoordinatorEntity, SensorEntity):
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return _make_device_info(self.coordinator)
+        self._attr_device_info = _make_device_info(self.coordinator)
 
     @property
     def unique_id(self) -> str:
@@ -203,10 +197,7 @@ class PocketSmithCategoriesSensor(CoordinatorEntity, SensorEntity):
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return _make_device_info(self.coordinator)
+        self._attr_device_info = _make_device_info(self.coordinator)
 
     @property
     def unique_id(self) -> str:
@@ -251,10 +242,7 @@ class PocketSmithCategorySensor(CoordinatorEntity, SensorEntity):
         self._category_id = enriched_category["category_id"]
         raw_slug = enriched_category.get("category_title", "").lower().replace(" ", "_")
         self._category_slug = re.sub(r"[^\w]", "", raw_slug)
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return _make_device_info(self.coordinator)
+        self._attr_device_info = _make_device_info(self.coordinator)
 
     @property
     def _enriched(self) -> dict:
@@ -283,7 +271,7 @@ class PocketSmithCategorySensor(CoordinatorEntity, SensorEntity):
     @property
     def native_unit_of_measurement(self) -> str:
         """Return the currency code."""
-        return self._enriched.get("currency", "AUD")
+        return self._enriched.get("currency", DEFAULT_CURRENCY)
 
     @property
     def icon(self) -> str:
@@ -344,10 +332,7 @@ class PocketSmithCategoryRollupSensor(CoordinatorEntity, SensorEntity):
         self._category_slug = re.sub(r"[^\w]", "", raw_slug)
         self._category_level = category_level
         self._currency = currency
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return _make_device_info(self.coordinator)
+        self._attr_device_info = _make_device_info(self.coordinator)
 
     @property
     def unique_id(self) -> str:
@@ -428,11 +413,7 @@ class PocketSmithNetWorthSensor(CoordinatorEntity, SensorEntity):
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return _make_device_info(self.coordinator)
+        self._attr_device_info = _make_device_info(self.coordinator)
 
     @property
     def unique_id(self) -> str:
@@ -457,8 +438,8 @@ class PocketSmithNetWorthSensor(CoordinatorEntity, SensorEntity):
         """Return the currency code from the first account."""
         accounts = self.coordinator.data.get("accounts", [])
         if accounts:
-            return (accounts[0].get("currency_code") or "AUD").upper()
-        return "AUD"
+            return (accounts[0].get("currency_code") or DEFAULT_CURRENCY).upper()
+        return DEFAULT_CURRENCY
 
     @property
     def icon(self) -> str:
@@ -475,11 +456,7 @@ class PocketSmithUserSensor(CoordinatorEntity, SensorEntity):
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info."""
-        return _make_device_info(self.coordinator)
+        self._attr_device_info = _make_device_info(self.coordinator)
 
     @property
     def unique_id(self) -> str:

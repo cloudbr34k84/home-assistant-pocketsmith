@@ -12,7 +12,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .api import API_BASE as _API_BASE, REQUEST_TIMEOUT as _REQUEST_TIMEOUT, parse_link_next as _parse_link_next, raise_for_api_error as _raise_for_api_error
-from .const import DOMAIN
+from .const import DEFAULT_CURRENCY, DOMAIN
 from .statistics import async_insert_statistics
 
 _LOGGER = logging.getLogger(__name__)
@@ -291,7 +291,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             over_by = None
             over_budget = False
             percentage_used = None
-            currency = "AUD"
+            currency = DEFAULT_CURRENCY
 
             actual = monthly_transactions.get(cat_id)
 
@@ -321,7 +321,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                             cat.get("title"), cat_id,
                         )
                         continue
-                    currency = analysis.get("currency_code", "AUD").upper()
+                    currency = analysis.get("currency_code", DEFAULT_CURRENCY).upper()
                     current_period = next(
                         (p for p in analysis.get("periods", []) if p.get("current")),
                         None,
@@ -351,7 +351,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                 for pkg in budget_by_category.get(cat_id, []):
                     analysis = pkg.get("expense") or pkg.get("income")
                     if analysis:
-                        currency = analysis.get("currency_code", "AUD").upper()
+                        currency = analysis.get("currency_code", DEFAULT_CURRENCY).upper()
                         break
 
             if budgeted is not None:

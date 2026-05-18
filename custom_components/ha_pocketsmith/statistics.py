@@ -25,7 +25,7 @@ from homeassistant.components.recorder.statistics import async_add_external_stat
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import DEFAULT_CURRENCY, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ def _insert_account_statistics(hass: HomeAssistant, data: dict, stat_start: date
 
         account_id = account["id"]
         title = account.get("title") or "Unnamed Account"
-        currency = (account.get("currency_code") or "AUD").upper()
+        currency = (account.get("currency_code") or DEFAULT_CURRENCY).upper()
 
         async_add_external_statistics(
             hass,
@@ -116,7 +116,7 @@ def _insert_net_worth_statistic(hass: HomeAssistant, data: dict, stat_start: dat
         return
 
     net_worth = sum(acc.get("current_balance") or 0 for acc in accounts)
-    currency = (accounts[0].get("currency_code") or "AUD").upper()
+    currency = (accounts[0].get("currency_code") or DEFAULT_CURRENCY).upper()
 
     async_add_external_statistics(
         hass,
@@ -149,7 +149,7 @@ def _insert_category_statistics(hass: HomeAssistant, data: dict, stat_start: dat
 
         cat_id = cat["category_id"]
         cat_title = cat.get("category_title") or "Unnamed Category"
-        currency = (cat.get("currency") or "AUD").upper()
+        currency = (cat.get("currency") or DEFAULT_CURRENCY).upper()
         parent_title = cat.get("parent_title")
         display_name = "%s: %s" % (parent_title, cat_title) if parent_title else cat_title
         spend = float(actual)
