@@ -22,7 +22,7 @@ async def system_health_info(hass: HomeAssistant) -> dict[str, Any]:
 
     entry = entries[0]
     try:
-        coordinator = entry.runtime_data
+        coordinator = entry.runtime_data.coordinator
     except AttributeError:
         return {"api_reachable": False}
 

@@ -24,10 +24,10 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up PocketSmith button entities from a config entry."""
-    coordinator: PocketSmithCoordinator = entry.runtime_data
+    coordinator: PocketSmithCoordinator = entry.runtime_data.coordinator
     async_add_entities([
         PocketSmithRefreshButton(coordinator),
-        PocketSmithResetBackfillButton(coordinator),
+        PocketSmithResetBackfillButton(coordinator, entry),
     ])
 
 
@@ -57,8 +57,9 @@ class PocketSmithResetBackfillButton(CoordinatorEntity, ButtonEntity):
     _attr_icon = "mdi:history"
     _attr_entity_category = EntityCategory.CONFIG
 
-    def __init__(self, coordinator: PocketSmithCoordinator) -> None:
+    def __init__(self, coordinator: PocketSmithCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
+        self._entry = entry
         self._attr_unique_id = "pocketsmith_%s_reset_backfill" % coordinator.data["user_id"]
         self._attr_device_info = _make_device_info(coordinator)
 
@@ -69,7 +70,7 @@ class PocketSmithResetBackfillButton(CoordinatorEntity, ButtonEntity):
         clear_backfill_failed_issue(self.hass)
         _LOGGER.info("PocketSmith backfill reset via button")
 
-        for entry in self.hass.config_entries.async_entries(DOMAIN):
-            await async_trigger_backfill(
-                self.hass, self.coordinator, self.coordinator.data, entry
-            )
+        await async_trigger_backfill(
+            self.hass, self.coordinator, self.coordinator.data,
+            self._entry, self._entry.runtime_data.backfill,
+        )

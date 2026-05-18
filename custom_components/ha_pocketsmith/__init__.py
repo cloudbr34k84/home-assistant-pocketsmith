@@ -14,16 +14,18 @@ from .const import (
     DEFAULT_ENABLE_BACKFILL,
     DEFAULT_UPDATE_INTERVAL_HOURS,
     DOMAIN,
+    BackfillState,
+    PocketSmithData,
 )
 from .coordinator import PocketSmithCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor", "binary_sensor", "button", "number"]
+PLATFORMS = ["sensor", "binary_sensor", "button", "number", "select"]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-type PocketSmithConfigEntry = ConfigEntry[PocketSmithCoordinator]
+type PocketSmithConfigEntry = ConfigEntry[PocketSmithData]
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -53,11 +55,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: PocketSmithConfigEntry) 
         entry=entry,
     )
     await coordinator.async_config_entry_first_refresh()
-    entry.runtime_data = coordinator
+    entry.runtime_data = PocketSmithData(coordinator=coordinator, backfill=BackfillState())
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    await async_trigger_backfill(hass, coordinator, coordinator.data, entry)
+    await async_trigger_backfill(hass, coordinator, coordinator.data, entry, entry.runtime_data.backfill)
 
     async_register_actions(hass)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
@@ -67,7 +69,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PocketSmithConfigEntry) 
 
 async def _async_options_updated(hass: HomeAssistant, entry: PocketSmithConfigEntry) -> None:
     """Handle options updates — adjust coordinator interval and re-trigger backfill if needed."""
-    coordinator: PocketSmithCoordinator = entry.runtime_data
+    coordinator: PocketSmithCoordinator = entry.runtime_data.coordinator
 
     new_interval = _update_interval_from_options(entry)
     if coordinator.update_interval != new_interval:
@@ -78,7 +80,7 @@ async def _async_options_updated(hass: HomeAssistant, entry: PocketSmithConfigEn
         coordinator.update_interval = new_interval
 
     if entry.options.get(CONF_ENABLE_BACKFILL, DEFAULT_ENABLE_BACKFILL):
-        await async_trigger_backfill(hass, coordinator, coordinator.data, entry)
+        await async_trigger_backfill(hass, coordinator, coordinator.data, entry, entry.runtime_data.backfill)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: PocketSmithConfigEntry) -> bool:

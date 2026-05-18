@@ -31,6 +31,7 @@ def _update_uncategorised_issue(hass: HomeAssistant, data: dict) -> None:
             severity=IssueSeverity.WARNING,
             translation_key=ISSUE_UNCATEGORISED,
             translation_placeholders={"count": str(count)},
+            learn_more_url="https://app.pocketsmith.com",
         )
     else:
         async_delete_issue(hass, DOMAIN, ISSUE_UNCATEGORISED)
@@ -55,6 +56,7 @@ def _update_over_budget_issue(hass: HomeAssistant, data: dict) -> None:
                 "count": str(len(over)),
                 "categories": ", ".join(over[:5]),
             },
+            learn_more_url="https://app.pocketsmith.com",
         )
     else:
         async_delete_issue(hass, DOMAIN, ISSUE_OVER_BUDGET)

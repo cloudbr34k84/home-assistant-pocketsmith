@@ -46,7 +46,17 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .api import API_BASE, parse_link_next, raise_for_api_error
-from .const import CONF_ENABLE_BACKFILL, DEFAULT_CURRENCY, DEFAULT_ENABLE_BACKFILL, DOMAIN
+from .const import (
+    BACKFILL_STATUS_COMPLETE,
+    BACKFILL_STATUS_FAILED,
+    BACKFILL_STATUS_IDLE,
+    BACKFILL_STATUS_RUNNING,
+    CONF_ENABLE_BACKFILL,
+    DEFAULT_CURRENCY,
+    DEFAULT_ENABLE_BACKFILL,
+    DOMAIN,
+    BackfillState,
+)
 from .repairs import raise_backfill_failed_issue
 from .statistics import (
     _account_statistic_id,
@@ -64,31 +74,35 @@ _MAX_RETRIES = 5
 _INTER_PAGE_DELAY = 0.2  # seconds between pages to be a polite API consumer
 
 
-async def async_trigger_backfill(hass: HomeAssistant, coordinator, data: dict, entry) -> None:
+async def async_trigger_backfill(
+    hass: HomeAssistant, coordinator, data: dict, entry, backfill_state: BackfillState
+) -> None:
     """Spawn the backfill sweep as a background task if enabled and not already complete."""
     if not entry.options.get(CONF_ENABLE_BACKFILL, DEFAULT_ENABLE_BACKFILL):
         _LOGGER.debug("PocketSmith backfill is disabled in options — skipping")
         return
 
     hass.async_create_task(
-        _run_backfill(hass, coordinator, data),
+        _run_backfill(hass, coordinator, data, backfill_state),
         name="pocketsmith_backfill",
         eager_start=False,
     )
 
 
-async def _run_backfill(hass: HomeAssistant, coordinator, data: dict) -> None:
+async def _run_backfill(hass: HomeAssistant, coordinator, data: dict, backfill_state: BackfillState) -> None:
     """Full historical backfill — runs in the background, resumes on restart."""
     try:
-        await _run_backfill_inner(hass, coordinator, data)
+        await _run_backfill_inner(hass, coordinator, data, backfill_state)
     except Exception:
+        backfill_state.status = BACKFILL_STATUS_FAILED
+        backfill_state.current_account = None
         _LOGGER.exception(
             "PocketSmith backfill crashed unexpectedly — progress saved so far will be "
             "retained. Restart Home Assistant to retry from the last completed account."
         )
 
 
-async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> None:
+async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict, backfill_state: BackfillState) -> None:
     """Inner backfill implementation — called by _run_backfill inside a safety net."""
     store = Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
     stored = await store.async_load() or {}
@@ -97,6 +111,8 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
 
     if all_done:
         _LOGGER.debug("PocketSmith backfill already complete — skipping")
+        backfill_state.status = BACKFILL_STATUS_COMPLETE
+        backfill_state.accounts_remaining = 0
         return
 
     _LOGGER.info("PocketSmith backfill starting")
@@ -136,6 +152,11 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
     session = async_get_clientsession(hass)
     today = dt_util.now().date()
 
+    pending_accounts = [a for a in accounts if a["id"] not in completed_accounts]
+    backfill_state.status = BACKFILL_STATUS_RUNNING
+    backfill_state.accounts_total = len(accounts)
+    backfill_state.accounts_remaining = len(pending_accounts)
+
     for account in accounts:
         account_id = account["id"]
 
@@ -144,6 +165,7 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
             continue
 
         title = account_titles.get(account_id, str(account_id))
+        backfill_state.current_account = title
         _LOGGER.info("PocketSmith backfill: sweeping account '%s' (id=%s)", title, account_id)
 
         daily_nets, cat_totals = await _sweep_account(
@@ -159,6 +181,7 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
                 title,
             )
             raise_backfill_failed_issue(hass, title)
+            backfill_state.accounts_remaining = max(0, backfill_state.accounts_remaining - 1)
             continue
 
         account_daily_nets[account_id] = daily_nets
@@ -169,6 +192,7 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
 
         # Mark this account as done and persist immediately so a restart skips it.
         completed_accounts.add(account_id)
+        backfill_state.accounts_remaining = max(0, backfill_state.accounts_remaining - 1)
         await store.async_save({
             "completed_accounts": list(completed_accounts),
             "all_done": False,
@@ -287,6 +311,9 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
 
     # Mark fully done.
     await store.async_save({"completed_accounts": list(completed_accounts), "all_done": True})
+    backfill_state.status = BACKFILL_STATUS_COMPLETE
+    backfill_state.accounts_remaining = 0
+    backfill_state.current_account = None
     _LOGGER.info("PocketSmith backfill complete")
 
 

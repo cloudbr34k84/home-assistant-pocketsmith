@@ -20,7 +20,7 @@ def async_register_actions(hass: HomeAssistant) -> None:
     async def handle_refresh(call: ServiceCall) -> None:
         """Force an immediate coordinator refresh."""
         for entry in hass.config_entries.async_entries(DOMAIN):
-            coordinator = entry.runtime_data
+            coordinator = entry.runtime_data.coordinator
             await coordinator.async_request_refresh()
             _LOGGER.debug("PocketSmith manual refresh triggered")
 
@@ -32,13 +32,13 @@ def async_register_actions(hass: HomeAssistant) -> None:
         _LOGGER.info("PocketSmith backfill progress reset — will re-sweep on next startup")
 
         for entry in hass.config_entries.async_entries(DOMAIN):
-            coordinator = entry.runtime_data
-            await async_trigger_backfill(hass, coordinator, coordinator.data, entry)
+            coordinator = entry.runtime_data.coordinator
+            await async_trigger_backfill(hass, coordinator, coordinator.data, entry, entry.runtime_data.backfill)
 
     async def handle_get_budget_summary(call: ServiceCall) -> ServiceResponse:
         """Return current budget summary as structured data."""
         for entry in hass.config_entries.async_entries(DOMAIN):
-            coordinator = entry.runtime_data
+            coordinator = entry.runtime_data.coordinator
             data = coordinator.data
             categories = data.get("enriched_categories", [])
             over_budget = [c for c in categories if c.get("over_budget")]

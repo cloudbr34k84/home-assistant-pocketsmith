@@ -32,7 +32,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up PocketSmith number entities from a config entry."""
-    coordinator: PocketSmithCoordinator = entry.runtime_data
+    coordinator: PocketSmithCoordinator = entry.runtime_data.coordinator
     async_add_entities([PocketSmithPollingIntervalNumber(coordinator, entry)])
 
 

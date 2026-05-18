@@ -10,7 +10,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DEFAULT_CURRENCY, DOMAIN
+from .const import BACKFILL_STATUS_IDLE, CONF_ACTIVE_CURRENCY, DEFAULT_CURRENCY, DOMAIN, BackfillState
 from .coordinator import PocketSmithCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -50,7 +50,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up PocketSmith sensors from a config entry."""
-    coordinator: PocketSmithCoordinator = entry.runtime_data
+    coordinator: PocketSmithCoordinator = entry.runtime_data.coordinator
+    backfill_state: BackfillState = entry.runtime_data.backfill
 
     enriched_categories = coordinator.data.get("enriched_categories", [])
 
@@ -87,8 +88,9 @@ async def async_setup_entry(
         for cat_id in parent_ids
         if cat_id in cat_by_id
     )
-    sensors.append(PocketSmithNetWorthSensor(coordinator))
+    sensors.append(PocketSmithNetWorthSensor(coordinator, entry))
     sensors.append(PocketSmithUserSensor(coordinator))
+    sensors.append(PocketSmithBackfillSensor(coordinator, backfill_state))
     async_add_entities(sensors)
 
 
@@ -403,9 +405,10 @@ class PocketSmithNetWorthSensor(CoordinatorEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = SensorStateClass.TOTAL
 
-    def __init__(self, coordinator: PocketSmithCoordinator) -> None:
+    def __init__(self, coordinator: PocketSmithCoordinator, entry: ConfigEntry) -> None:
         """Initialise the sensor."""
         super().__init__(coordinator)
+        self._entry = entry
         self._user_id = coordinator.data["user_id"]
         self._attr_device_info = _make_device_info(self.coordinator)
 
@@ -424,7 +427,10 @@ class PocketSmithNetWorthSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_unit_of_measurement(self) -> str:
-        """Return the currency code from the first account."""
+        """Return the active currency from options, falling back to the first account's currency."""
+        active = self._entry.options.get(CONF_ACTIVE_CURRENCY)
+        if active:
+            return active.upper()
         accounts = self.coordinator.data.get("accounts", [])
         if accounts:
             return (accounts[0].get("currency_code") or DEFAULT_CURRENCY).upper()
@@ -471,3 +477,41 @@ class PocketSmithUserSensor(CoordinatorEntity, SensorEntity):
         if not user:
             return {}
         return {k: v for k, v in user.items() if k not in ("email", "tell_a_friend_code")}
+
+
+class PocketSmithBackfillSensor(CoordinatorEntity, SensorEntity):
+    """Sensor that exposes historical backfill progress.
+
+    State is one of: idle / running / complete / failed.
+    Attributes include accounts_total, accounts_remaining, and current_account.
+    The sensor polls the BackfillState object which is mutated in-place by the
+    background task — no coordinator refresh needed for live updates.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "backfill_status"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:database-clock-outline"
+
+    def __init__(self, coordinator: PocketSmithCoordinator, backfill_state: BackfillState) -> None:
+        """Initialise the sensor."""
+        super().__init__(coordinator)
+        self._backfill = backfill_state
+        self._user_id = coordinator.data["user_id"]
+        self._attr_device_info = _make_device_info(coordinator)
+
+    @property
+    def unique_id(self) -> str:
+        return "pocketsmith_%s_backfill_status" % self._user_id
+
+    @property
+    def native_value(self) -> str:
+        return self._backfill.status
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            "accounts_total": self._backfill.accounts_total,
+            "accounts_remaining": self._backfill.accounts_remaining,
+            "current_account": self._backfill.current_account,
+        }
