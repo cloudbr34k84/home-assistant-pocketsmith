@@ -53,7 +53,6 @@ from .statistics import (
     _month_start_utc,
     _net_worth_statistic_id,
     _slug,
-    _UNIT_CLASS_MONETARY,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -193,7 +192,6 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
                 "name": "%s Balance" % title,
                 "source": DOMAIN,
                 "statistic_id": statistic_id,
-                "unit_class": _UNIT_CLASS_MONETARY,
                 "unit_of_measurement": currency,
             }
             async_add_external_statistics(hass, metadata, rows)
@@ -219,7 +217,6 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
                     "name": "Net Worth",
                     "source": DOMAIN,
                     "statistic_id": _net_worth_statistic_id(user_id),
-                    "unit_class": _UNIT_CLASS_MONETARY,
                     "unit_of_measurement": currency,
                 },
                 nw_rows,
@@ -244,20 +241,28 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
         parent_title = _resolve_parent_title(cat_id, cat_meta)
         display_name = "%s: %s" % (parent_title, cat_title) if parent_title else cat_title
 
-        month_rows: list[StatisticData] = []
+        # Collect (start, state, last_reset) tuples sorted by date first,
+        # then compute cumulative sum across months.
+        unsorted_rows: list[tuple[datetime, float, datetime]] = []
         for (cid, year, month), total in category_month_totals.items():
             if cid != cat_id:
                 continue
             month_reset = _month_start_utc(year, month)
             row_start = datetime(year, month, 1, 0, 0, 0, tzinfo=timezone.utc)
+            unsorted_rows.append((row_start, round(total, 2), month_reset))
+
+        unsorted_rows.sort(key=lambda r: r[0])
+        month_rows: list[StatisticData] = []
+        cumulative_sum = 0.0
+        for row_start, state, month_reset in unsorted_rows:
+            cumulative_sum += state
             month_rows.append(StatisticData(
                 start=row_start,
-                state=round(total, 2),
-                sum=round(total, 2),
+                state=state,
+                sum=round(cumulative_sum, 2),
                 last_reset=month_reset,
             ))
 
-        month_rows.sort(key=lambda r: r.start)
         if month_rows:
             async_add_external_statistics(
                 hass,
@@ -267,7 +272,6 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
                     "name": display_name,
                     "source": DOMAIN,
                     "statistic_id": statistic_id,
-                    "unit_class": _UNIT_CLASS_MONETARY,
                     "unit_of_measurement": currency,
                 },
                 month_rows,
