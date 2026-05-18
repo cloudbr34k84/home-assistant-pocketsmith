@@ -12,7 +12,13 @@
       "Bash(gh release *)",
       "Skill(aurora:HA-Integration-Dev)",
       "Skill(aurora:HA-Integration-Dev:*)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(grep -i \"pocketsmith\\\\|ha_pocketsmith\" /homeassistant/home-assistant.log 2>/dev/null | tail -40)",
+      "Read(//homeassistant/**)",
+      "Bash(python3 -c 'import ast, sys *)",
+      "Bash(python3 -c \"import homeassistant; print\\(homeassistant.__file__\\)\")",
+      "Bash(ls -la /homeassistant/home-assistant.log /config/home-assistant.log 2>/dev/null; grep -i \"ha_pocketsmith\\\\|pocketsmith\\\\|Starting Home\\\\|integration\" /homeassistant/.storage/core.config_entries 2>/dev/null | grep -i \"pocket\" | head -10)",
+      "Read(//config/**)"
     ]
   },
   "enabledPlugins": {

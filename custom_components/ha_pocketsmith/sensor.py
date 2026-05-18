@@ -218,7 +218,7 @@ class PocketSmithCategorySensor(CoordinatorEntity, SensorEntity):
 
     _attr_has_entity_name = True
     _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_state_class = SensorStateClass.TOTAL
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: PocketSmithCoordinator, enriched_category: dict) -> None:
         """Initialise the sensor."""
