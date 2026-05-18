@@ -52,6 +52,20 @@ async def async_setup_entry(
     """Set up PocketSmith sensors from a config entry."""
     coordinator: PocketSmithCoordinator = entry.runtime_data
 
+    enriched_categories = coordinator.data.get("enriched_categories", [])
+
+    # Determine which category IDs are parents (appear as parent_id of at least one other).
+    parent_ids: set[int] = {
+        cat["parent_id"]
+        for cat in enriched_categories
+        if cat.get("parent_id") is not None
+    }
+
+    # Build a lookup of category_id → enriched dict for rollup sensor construction.
+    cat_by_id: dict[int, dict] = {
+        cat["category_id"]: cat for cat in enriched_categories
+    }
+
     sensors = [
         PocketSmithSensor(coordinator, account)
         for account in coordinator.data["accounts"]
@@ -60,7 +74,18 @@ async def async_setup_entry(
     sensors.append(PocketSmithCategoriesSensor(coordinator))
     sensors.extend(
         PocketSmithCategorySensor(coordinator, enriched_category)
-        for enriched_category in coordinator.data.get("enriched_categories", [])
+        for enriched_category in enriched_categories
+    )
+    sensors.extend(
+        PocketSmithCategoryRollupSensor(
+            coordinator,
+            category_id=cat_id,
+            category_title=cat_by_id[cat_id].get("category_title", ""),
+            category_level=cat_by_id[cat_id].get("category_level", 1),
+            currency=(cat_by_id[cat_id].get("currency") or "AUD").upper(),
+        )
+        for cat_id in parent_ids
+        if cat_id in cat_by_id
     )
     sensors.append(PocketSmithNetWorthSensor(coordinator))
     sensors.append(PocketSmithUserSensor(coordinator))
@@ -285,6 +310,110 @@ class PocketSmithCategorySensor(CoordinatorEntity, SensorEntity):
             "percentage_used": e.get("percentage_used"),
             "currency": e.get("currency"),
             "transaction_count": e.get("transaction_count"),
+            "category_level": e.get("category_level"),
+            "is_rollup": False,
+        }
+
+
+class PocketSmithCategoryRollupSensor(CoordinatorEntity, SensorEntity):
+    """Sensor that aggregates all direct and indirect children of a parent category.
+
+    Identified by:
+      - unique_id prefix  pocketsmith_rollup_
+      - icon              mdi:folder-open
+      - is_rollup: True   attribute
+      - category_level    attribute (1 = top-level, 2 = mid-level)
+    """
+
+    _attr_has_entity_name = True
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: PocketSmithCoordinator,
+        category_id: int,
+        category_title: str,
+        category_level: int,
+        currency: str,
+    ) -> None:
+        """Initialise the rollup sensor."""
+        super().__init__(coordinator)
+        self._category_id = category_id
+        raw_slug = category_title.lower().replace(" ", "_")
+        self._category_slug = re.sub(r"[^\w]", "", raw_slug)
+        self._category_level = category_level
+        self._currency = currency
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return _make_device_info(self.coordinator)
+
+    @property
+    def unique_id(self) -> str:
+        return "pocketsmith_rollup_%s_%s" % (self._category_id, self._category_slug)
+
+    @property
+    def name(self) -> str:
+        for cat in self.coordinator.data.get("enriched_categories", []):
+            if cat.get("category_id") == self._category_id:
+                return cat.get("category_title", self._category_slug)
+        return self._category_slug
+
+    @property
+    def icon(self) -> str:
+        return "mdi:folder-open"
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        return self._currency
+
+    def _children(self) -> list[dict]:
+        """Return all enriched categories whose parent_id matches this category."""
+        return [
+            cat for cat in self.coordinator.data.get("enriched_categories", [])
+            if cat.get("parent_id") == self._category_id
+        ]
+
+    @property
+    def native_value(self):
+        """Return sum of actual spend across all children."""
+        return round(
+            sum(c.get("actual") or 0 for c in self._children()), 2
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        children = self._children()
+        total_actual = sum(c.get("actual") or 0 for c in children)
+        total_budgeted = sum(c.get("budgeted") or 0 for c in children)
+        over_budget = total_actual > total_budgeted
+        return {
+            "category_id": self._category_id,
+            "category_level": self._category_level,
+            "is_rollup": True,
+            "actual": round(total_actual, 2),
+            "budgeted": round(total_budgeted, 2),
+            "remaining": round(total_budgeted - total_actual, 2) if not over_budget else 0,
+            "over_budget": over_budget,
+            "over_by": round(total_actual - total_budgeted, 2) if over_budget else 0,
+            "percentage_used": round(total_actual / total_budgeted * 100, 2) if total_budgeted > 0 else None,
+            "currency": self._currency,
+            "children": [
+                {
+                    "category_id": c.get("category_id"),
+                    "category_title": c.get("category_title"),
+                    "actual": c.get("actual"),
+                    "budgeted": c.get("budgeted"),
+                    "remaining": c.get("remaining"),
+                    "over_budget": c.get("over_budget"),
+                    "over_by": c.get("over_by"),
+                    "percentage_used": c.get("percentage_used"),
+                    "transaction_count": c.get("transaction_count"),
+                    "category_level": c.get("category_level"),
+                }
+                for c in children
+            ],
         }
 
 

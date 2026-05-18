@@ -30,6 +30,21 @@
       "reauth_successful": "Re-authentication was successful."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "PocketSmith Options",
+        "data": {
+          "update_interval_hours": "Polling interval (hours)",
+          "enable_backfill": "Enable historical backfill"
+        },
+        "data_description": {
+          "update_interval_hours": "How often to fetch data from PocketSmith. Lower values use more API quota.",
+          "enable_backfill": "Fetch your full transaction history on first setup to populate long-term statistics graphs. Disable if you have a large history and want to avoid the initial API load."
+        }
+      }
+    }
+  },
   "system_health": {
     "info": {
       "api_reachable": "Reach PocketSmith API",

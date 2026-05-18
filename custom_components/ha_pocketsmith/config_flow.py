@@ -7,7 +7,13 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN
+from .const import (
+    CONF_ENABLE_BACKFILL,
+    CONF_UPDATE_INTERVAL_HOURS,
+    DEFAULT_ENABLE_BACKFILL,
+    DEFAULT_UPDATE_INTERVAL_HOURS,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 _API_ME = "https://api.pocketsmith.com/v2/me"
@@ -30,11 +36,39 @@ async def _validate_developer_key(hass, developer_key: str) -> None:
             response.raise_for_status()
 
 
+class PocketSmithOptionsFlow(config_entries.OptionsFlow):
+    """Handle PocketSmith options."""
+
+    async def async_step_init(self, user_input=None):
+        """Show the options form."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        current = self.config_entry.options
+        schema = vol.Schema({
+            vol.Required(
+                CONF_UPDATE_INTERVAL_HOURS,
+                default=current.get(CONF_UPDATE_INTERVAL_HOURS, DEFAULT_UPDATE_INTERVAL_HOURS),
+            ): vol.All(int, vol.Range(min=1, max=24)),
+            vol.Required(
+                CONF_ENABLE_BACKFILL,
+                default=current.get(CONF_ENABLE_BACKFILL, DEFAULT_ENABLE_BACKFILL),
+            ): bool,
+        })
+
+        return self.async_show_form(step_id="init", data_schema=schema)
+
+
 class PocketSmithConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle the PocketSmith UI setup flow."""
 
     VERSION = 2
     MINOR_VERSION = 1
+
+    @staticmethod
+    def async_get_options_flow(config_entry):
+        """Return the options flow handler."""
+        return PocketSmithOptionsFlow()
 
     async def async_step_user(self, user_input=None):
         """Handle the initial setup step."""

@@ -87,7 +87,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         }
 
         try:
-            await async_insert_statistics(self.hass, result, self)
+            async_insert_statistics(self.hass, result)
         except Exception:
             _LOGGER.exception("Failed to insert PocketSmith long-term statistics")
 
@@ -256,6 +256,17 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
         flat_cats = {}
         _flatten(categories, flat_cats)
 
+        def _category_level(cat_id: int) -> int:
+            level = 1
+            current = flat_cats.get(cat_id, {})
+            while current.get("parent_id"):
+                parent = flat_cats.get(current["parent_id"])
+                if not parent:
+                    break
+                level += 1
+                current = parent
+            return level
+
         budget_by_category = {}
         for pkg in budget:
             if not isinstance(pkg, dict):
@@ -369,6 +380,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                 "percentage_used": percentage_used,
                 "currency": currency,
                 "transaction_count": monthly_transaction_counts.get(cat_id, 0),
+                "category_level": _category_level(cat_id),
             })
 
         return result
