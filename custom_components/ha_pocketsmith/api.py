@@ -8,7 +8,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 _LOGGER = logging.getLogger(__name__)
 
 API_BASE = "https://api.pocketsmith.com/v2"
-REQUEST_TIMEOUT = 10
+REQUEST_TIMEOUT = 30
 _MAX_RETRY_AFTER = 300
 
 

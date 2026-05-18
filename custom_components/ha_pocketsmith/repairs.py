@@ -1,8 +1,7 @@
 """Repair issue helpers for the PocketSmith integration."""
 import logging
 
-from homeassistant.components.repairs import async_create_issue, async_delete_issue
-from homeassistant.helpers.issue_registry import IssueSeverity
+from homeassistant.helpers.issue_registry import IssueSeverity, async_create_issue, async_delete_issue
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN

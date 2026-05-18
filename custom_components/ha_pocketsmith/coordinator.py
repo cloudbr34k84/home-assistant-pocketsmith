@@ -2,6 +2,7 @@
 import asyncio
 import calendar
 import logging
+import time
 from datetime import date
 
 import aiohttp
@@ -53,6 +54,8 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> dict:
         """Fetch user, accounts, and uncategorised transaction count."""
         session = async_get_clientsession(self.hass)
+        _LOGGER.debug("PocketSmith data refresh starting")
+        _t0 = time.monotonic()
 
         try:
             user_id, user = await self._fetch_user_id(session)
@@ -63,13 +66,21 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             monthly_transactions, monthly_transaction_counts = await self._fetch_monthly_transactions(session, user_id)
             monthly_events = await self._fetch_monthly_events(session, user_id)
         except aiohttp.ClientError as err:
+            _LOGGER.error("Unable to reach the PocketSmith API: %s", err)
             raise UpdateFailed(
                 "Unable to reach the PocketSmith API. Check your network connection."
             ) from err
-        except asyncio.TimeoutError as err:
+        except asyncio.TimeoutError:
+            _LOGGER.error(
+                "PocketSmith API request timed out after %ss (%.1fs elapsed total)",
+                _REQUEST_TIMEOUT,
+                time.monotonic() - _t0,
+            )
             raise UpdateFailed(
                 "PocketSmith API request timed out. Check your network connection."
-            ) from err
+            )
+
+        _LOGGER.debug("PocketSmith API fetch complete in %.1fs", time.monotonic() - _t0)
 
         enriched_categories = self._build_enriched_categories(categories, budget, monthly_transactions, monthly_events, monthly_transaction_counts)
 

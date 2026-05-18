@@ -120,12 +120,12 @@
   },
   "issues": {
     "uncategorised_transactions": {
-      "title": "PocketSmith: {count} uncategorised transaction(s)",
-      "description": "You have **{count}** uncategorised transaction(s) in PocketSmith. Categorise them to keep your budget data accurate."
+      "title": "PocketSmith: {count} uncategorised transactions",
+      "description": "You have **{count}** uncategorised transactions in PocketSmith. Categorise them to keep your budget data accurate."
     },
     "over_budget": {
-      "title": "PocketSmith: over budget in {count} categor(y/ies)",
-      "description": "You are over budget this month in **{count}** categor(y/ies): {categories}. Review your spending in PocketSmith."
+      "title": "PocketSmith: over budget in {count} categories",
+      "description": "You are over budget this month in **{count}** categories: {categories}. Review your spending in PocketSmith."
     },
     "backfill_failed": {
       "title": "PocketSmith: historical backfill failed for account '{account}'",
