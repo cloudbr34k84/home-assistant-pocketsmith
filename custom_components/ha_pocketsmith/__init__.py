@@ -6,6 +6,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import config_validation as cv
 
+from .actions import async_register_actions, async_unregister_actions
 from .backfill import async_trigger_backfill
 from .const import (
     CONF_ENABLE_BACKFILL,
@@ -18,7 +19,7 @@ from .coordinator import PocketSmithCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor", "binary_sensor"]
+PLATFORMS = ["sensor", "binary_sensor", "button"]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -58,6 +59,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PocketSmithConfigEntry) 
 
     await async_trigger_backfill(hass, coordinator, coordinator.data, entry)
 
+    async_register_actions(hass)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
     return True
@@ -81,4 +83,5 @@ async def _async_options_updated(hass: HomeAssistant, entry: PocketSmithConfigEn
 
 async def async_unload_entry(hass: HomeAssistant, entry: PocketSmithConfigEntry) -> bool:
     """Handle unloading of an entry."""
+    async_unregister_actions(hass)
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

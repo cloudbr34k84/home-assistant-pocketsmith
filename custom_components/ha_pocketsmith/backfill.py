@@ -47,6 +47,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import API_BASE, parse_link_next, raise_for_api_error
 from .const import CONF_ENABLE_BACKFILL, DEFAULT_CURRENCY, DEFAULT_ENABLE_BACKFILL, DOMAIN
+from .repairs import raise_backfill_failed_issue
 from .statistics import (
     _account_statistic_id,
     _category_statistic_id,
@@ -157,6 +158,7 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict) -> N
                 "Statistics for this account will be incomplete until the next backfill run.",
                 title,
             )
+            raise_backfill_failed_issue(hass, title)
             continue
 
         account_daily_nets[account_id] = daily_nets

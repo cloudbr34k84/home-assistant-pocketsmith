@@ -45,6 +45,69 @@
       }
     }
   },
+  "entity": {
+    "sensor": {
+      "uncategorised_transactions": {
+        "name": "Uncategorised Transactions"
+      },
+      "categories": {
+        "name": "Categories"
+      },
+      "net_worth": {
+        "name": "Net Worth"
+      },
+      "user": {
+        "name": "User"
+      }
+    },
+    "binary_sensor": {
+      "over_budget": {
+        "name": "Over Budget"
+      },
+      "forecast_needs_recalculate": {
+        "name": "Forecast Needs Recalculate"
+      },
+      "has_uncategorised": {
+        "name": "Has Uncategorised"
+      }
+    },
+    "button": {
+      "refresh": {
+        "name": "Refresh"
+      },
+      "reset_backfill": {
+        "name": "Reset Backfill"
+      }
+    }
+  },
+  "services": {
+    "refresh": {
+      "name": "Refresh",
+      "description": "Force an immediate data refresh from PocketSmith."
+    },
+    "reset_backfill": {
+      "name": "Reset backfill",
+      "description": "Clear historical backfill progress so all accounts are re-swept on the next startup."
+    },
+    "get_budget_summary": {
+      "name": "Get budget summary",
+      "description": "Return the current budget summary as structured data for use in automations."
+    }
+  },
+  "issues": {
+    "uncategorised_transactions": {
+      "title": "PocketSmith: {count} uncategorised transaction(s)",
+      "description": "You have **{count}** uncategorised transaction(s) in PocketSmith. Categorise them to keep your budget data accurate. [Open PocketSmith](https://app.pocketsmith.com)"
+    },
+    "over_budget": {
+      "title": "PocketSmith: over budget in {count} categor(y/ies)",
+      "description": "You are over budget this month in **{count}** categor(y/ies): {categories}. Review your spending in PocketSmith. [Open PocketSmith](https://app.pocketsmith.com)"
+    },
+    "backfill_failed": {
+      "title": "PocketSmith: historical backfill failed for account '{account}'",
+      "description": "The historical data sweep for account **{account}** failed after multiple retries. Statistics for this account may be incomplete. To retry, go to the integration options, disable and re-enable **Enable historical backfill**, then restart Home Assistant."
+    }
+  },
   "system_health": {
     "info": {
       "api_reachable": "Reach PocketSmith API",

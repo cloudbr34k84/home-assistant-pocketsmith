@@ -6,7 +6,7 @@ from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -155,6 +155,7 @@ class PocketSmithUncategorisedTransactions(CoordinatorEntity, SensorEntity):
     """Sensor reporting the count of uncategorised transactions."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "uncategorised_transactions"
 
     def __init__(self, coordinator: PocketSmithCoordinator) -> None:
         """Initialise the sensor."""
@@ -166,11 +167,6 @@ class PocketSmithUncategorisedTransactions(CoordinatorEntity, SensorEntity):
     def unique_id(self) -> str:
         """Return a unique ID for this sensor."""
         return "pocketsmith_%s_uncategorised_transactions" % self._user_id
-
-    @property
-    def name(self) -> str:
-        """Return the sensor name."""
-        return "Uncategorised Transactions"
 
     @property
     def native_value(self):
@@ -192,6 +188,8 @@ class PocketSmithCategoriesSensor(CoordinatorEntity, SensorEntity):
     """Sensor reporting the total number of PocketSmith categories."""
 
     _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "categories"
 
     def __init__(self, coordinator: PocketSmithCoordinator) -> None:
         """Initialise the sensor."""
@@ -203,11 +201,6 @@ class PocketSmithCategoriesSensor(CoordinatorEntity, SensorEntity):
     def unique_id(self) -> str:
         """Return a unique ID for this sensor."""
         return "pocketsmith_%s_categories" % self._user_id
-
-    @property
-    def name(self) -> str:
-        """Return the sensor name."""
-        return "Categories"
 
     @property
     def native_value(self):
@@ -406,6 +399,7 @@ class PocketSmithNetWorthSensor(CoordinatorEntity, SensorEntity):
     """Sensor reporting the total net worth across all accounts."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "net_worth"
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = SensorStateClass.TOTAL
 
@@ -419,11 +413,6 @@ class PocketSmithNetWorthSensor(CoordinatorEntity, SensorEntity):
     def unique_id(self) -> str:
         """Return a unique ID for this sensor."""
         return "pocketsmith_%s_net_worth" % self._user_id
-
-    @property
-    def name(self) -> str:
-        """Return the sensor name."""
-        return "Net Worth"
 
     @property
     def native_value(self):
@@ -451,6 +440,8 @@ class PocketSmithUserSensor(CoordinatorEntity, SensorEntity):
     """Sensor reporting PocketSmith user profile information."""
 
     _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "user"
 
     def __init__(self, coordinator: PocketSmithCoordinator) -> None:
         """Initialise the sensor."""
@@ -462,11 +453,6 @@ class PocketSmithUserSensor(CoordinatorEntity, SensorEntity):
     def unique_id(self) -> str:
         """Return a unique ID for this sensor."""
         return "pocketsmith_%s_user" % self._user_id
-
-    @property
-    def name(self) -> str:
-        """Return the sensor name."""
-        return "User"
 
     @property
     def native_value(self):

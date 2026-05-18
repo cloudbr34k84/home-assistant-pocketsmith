@@ -4,13 +4,13 @@ import logging
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .coordinator import PocketSmithCoordinator
-
 from .sensor import _make_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,27 +35,15 @@ class PocketSmithOverBudgetBinarySensor(CoordinatorEntity, BinarySensorEntity):
     """Binary sensor that is on when any non-transfer category is over budget."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "over_budget"
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
 
     def __init__(self, coordinator: PocketSmithCoordinator) -> None:
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
-        self._attr_device_class = BinarySensorDeviceClass.PROBLEM
-
-    @property
-    def device_info(self):
-        """Return device info."""
-        return _make_device_info(self.coordinator)
-
-    @property
-    def unique_id(self) -> str:
-        """Return a unique ID for this sensor."""
-        return "pocketsmith_%s_over_budget" % self._user_id
-
-    @property
-    def name(self) -> str:
-        """Return the sensor name."""
-        return "Over Budget"
+        self._attr_unique_id = "pocketsmith_%s_over_budget" % self._user_id
+        self._attr_device_info = _make_device_info(coordinator)
 
     @property
     def _over_budget_packages(self) -> list:
@@ -97,26 +85,15 @@ class PocketSmithForecastNeedsRecalculateBinarySensor(CoordinatorEntity, BinaryS
     """Binary sensor that is on when the forecast is stale or missing."""
 
     _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "forecast_needs_recalculate"
 
     def __init__(self, coordinator: PocketSmithCoordinator) -> None:
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
-
-    @property
-    def device_info(self):
-        """Return device info."""
-        return _make_device_info(self.coordinator)
-
-    @property
-    def unique_id(self) -> str:
-        """Return a unique ID for this sensor."""
-        return "pocketsmith_%s_forecast_needs_recalculate" % self._user_id
-
-    @property
-    def name(self) -> str:
-        """Return the sensor name."""
-        return "Forecast Needs Recalculate"
+        self._attr_unique_id = "pocketsmith_%s_forecast_needs_recalculate" % self._user_id
+        self._attr_device_info = _make_device_info(coordinator)
 
     @property
     def is_on(self) -> bool:
@@ -140,27 +117,15 @@ class PocketSmithHasUncategorisedBinarySensor(CoordinatorEntity, BinarySensorEnt
     """Binary sensor that is on when there are uncategorised transactions."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "has_uncategorised"
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
 
     def __init__(self, coordinator: PocketSmithCoordinator) -> None:
         """Initialise the sensor."""
         super().__init__(coordinator)
         self._user_id = coordinator.data["user_id"]
-        self._attr_device_class = BinarySensorDeviceClass.PROBLEM
-
-    @property
-    def device_info(self):
-        """Return device info."""
-        return _make_device_info(self.coordinator)
-
-    @property
-    def unique_id(self) -> str:
-        """Return a unique ID for this sensor."""
-        return "pocketsmith_%s_has_uncategorised" % self._user_id
-
-    @property
-    def name(self) -> str:
-        """Return the sensor name."""
-        return "Has Uncategorised"
+        self._attr_unique_id = "pocketsmith_%s_has_uncategorised" % self._user_id
+        self._attr_device_info = _make_device_info(coordinator)
 
     @property
     def is_on(self) -> bool:

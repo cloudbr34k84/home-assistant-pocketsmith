@@ -13,6 +13,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import API_BASE as _API_BASE, REQUEST_TIMEOUT as _REQUEST_TIMEOUT, parse_link_next as _parse_link_next, raise_for_api_error as _raise_for_api_error
 from .const import DEFAULT_CURRENCY, DOMAIN
+from .repairs import update_repair_issues
 from .statistics import async_insert_statistics
 
 _LOGGER = logging.getLogger(__name__)
@@ -90,6 +91,11 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             async_insert_statistics(self.hass, result)
         except Exception:
             _LOGGER.exception("Failed to insert PocketSmith long-term statistics")
+
+        try:
+            update_repair_issues(self.hass, result)
+        except Exception:
+            _LOGGER.exception("Failed to update PocketSmith repair issues")
 
         return result
 
