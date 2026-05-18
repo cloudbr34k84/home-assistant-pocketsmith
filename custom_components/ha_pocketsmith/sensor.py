@@ -357,8 +357,8 @@ class PocketSmithCategoryRollupSensor(CoordinatorEntity, SensorEntity):
     def name(self) -> str:
         for cat in self.coordinator.data.get("enriched_categories", []):
             if cat.get("category_id") == self._category_id:
-                return cat.get("category_title", self._category_slug)
-        return self._category_slug
+                return f"Rollup: {cat.get('category_title', self._category_slug)}"
+        return f"Rollup: {self._category_slug}"
 
     @property
     def icon(self) -> str:
