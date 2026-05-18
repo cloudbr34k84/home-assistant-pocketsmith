@@ -14,7 +14,7 @@ Design decisions
   point-in-time reading, not a meter — mean is the correct aggregate.
 * Category spend: has_sum=True with last_reset at the start of each calendar
   month. sum = current-month running spend, enabling month-over-month bar charts.
-* Uncategorised count: mean_type=ARITHMETIC, unit_class=None (dimensionless).
+* Uncategorised count: mean_type=ARITHMETIC, unit_of_measurement="transactions" (dimensionless).
 """
 import logging
 import re
@@ -28,8 +28,6 @@ from homeassistant.util import dt as dt_util
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
-
-_UNIT_CLASS_MONETARY = "monetary"
 
 
 # ---------------------------------------------------------------------------
@@ -53,8 +51,8 @@ def _uncategorised_statistic_id(user_id: int) -> str:
 
 
 def _slug(title: str) -> str:
-    raw = title.lower().replace(" ", "_")
-    return re.sub(r"[^\w]", "", raw)
+    raw = re.sub(r"[^\da-z]+", "_", title.lower())
+    return raw.strip("_") or "unnamed"
 
 
 def _month_start_utc(year: int, month: int) -> datetime:
@@ -88,8 +86,7 @@ def _insert_account_statistics(hass: HomeAssistant, data: dict, stat_start: date
             continue
 
         account_id = account["id"]
-        title = account.get("title", "Unnamed Account")
-        title_slug = title.replace(" ", "_").lower()
+        title = account.get("title") or "Unnamed Account"
         currency = (account.get("currency_code") or "AUD").upper()
 
         async_add_external_statistics(
@@ -99,8 +96,7 @@ def _insert_account_statistics(hass: HomeAssistant, data: dict, stat_start: date
                 "mean_type": StatisticMeanType.ARITHMETIC,
                 "name": "%s Balance" % title,
                 "source": DOMAIN,
-                "statistic_id": _account_statistic_id(account_id, title_slug),
-                "unit_class": _UNIT_CLASS_MONETARY,
+                "statistic_id": _account_statistic_id(account_id, _slug(title)),
                 "unit_of_measurement": currency,
             },
             [StatisticData(start=stat_start, mean=float(balance))],
@@ -129,7 +125,6 @@ def _insert_net_worth_statistic(hass: HomeAssistant, data: dict, stat_start: dat
             "name": "Net Worth",
             "source": DOMAIN,
             "statistic_id": _net_worth_statistic_id(user_id),
-            "unit_class": _UNIT_CLASS_MONETARY,
             "unit_of_measurement": currency,
         },
         [StatisticData(start=stat_start, mean=round(net_worth, 2))],
@@ -151,7 +146,7 @@ def _insert_category_statistics(hass: HomeAssistant, data: dict, stat_start: dat
             continue
 
         cat_id = cat["category_id"]
-        cat_title = cat.get("category_title", "")
+        cat_title = cat.get("category_title") or "Unnamed Category"
         currency = (cat.get("currency") or "AUD").upper()
         parent_title = cat.get("parent_title")
         display_name = "%s: %s" % (parent_title, cat_title) if parent_title else cat_title
@@ -165,7 +160,6 @@ def _insert_category_statistics(hass: HomeAssistant, data: dict, stat_start: dat
                 "name": display_name,
                 "source": DOMAIN,
                 "statistic_id": _category_statistic_id(cat_id, _slug(cat_title)),
-                "unit_class": _UNIT_CLASS_MONETARY,
                 "unit_of_measurement": currency,
             },
             [StatisticData(start=stat_start, state=spend, sum=spend, last_reset=month_reset)],
@@ -191,7 +185,6 @@ def _insert_uncategorised_statistic(hass: HomeAssistant, data: dict, stat_start:
             "name": "Uncategorised Transactions",
             "source": DOMAIN,
             "statistic_id": _uncategorised_statistic_id(user_id),
-            "unit_class": None,
             "unit_of_measurement": "transactions",
         },
         [StatisticData(start=stat_start, mean=float(count))],
