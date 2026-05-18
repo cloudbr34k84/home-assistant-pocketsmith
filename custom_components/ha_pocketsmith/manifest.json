@@ -5,7 +5,7 @@
     "@cloudbr34k84"
   ],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["recorder"],
   "documentation": "https://github.com/cloudbr34k84/home-assistant-pocketsmith",
   "integration_type": "service",
   "iot_class": "cloud_polling",

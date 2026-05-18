@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .statistics import async_insert_statistics
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -136,7 +137,7 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
 
         enriched_categories = self._build_enriched_categories(categories, budget, monthly_transactions, monthly_events, monthly_transaction_counts)
 
-        return {
+        result = {
             "user_id": user_id,
             "user": user,
             "accounts": accounts,
@@ -149,6 +150,13 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             "enriched_categories": enriched_categories,
             "forecast_last_updated": dt_util.utcnow(),
         }
+
+        try:
+            await async_insert_statistics(self.hass, result)
+        except Exception:
+            _LOGGER.exception("Failed to insert PocketSmith long-term statistics")
+
+        return result
 
     async def _fetch_user_id(self, session: aiohttp.ClientSession) -> int:
         """Return the authenticated user's ID."""
