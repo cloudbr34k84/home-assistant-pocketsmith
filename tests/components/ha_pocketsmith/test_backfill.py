@@ -100,14 +100,14 @@ class TestReconstructBalanceRows:
         # One transaction of +100 today means yesterday's balance was current - 100
         rows = _reconstruct_balance_rows({today: 100.0}, 1000.0, today)
         assert len(rows) == 1
-        assert rows[0].mean == 1000.0
+        assert rows[0]["mean"] == 1000.0
 
     def test_rows_sorted_ascending(self):
         today = date(2026, 5, 15)
         yesterday = date(2026, 5, 14)
         nets = {today: 50.0, yesterday: 30.0}
         rows = _reconstruct_balance_rows(nets, 500.0, today)
-        starts = [r.start for r in rows]
+        starts = [r["start"] for r in rows]
         assert starts == sorted(starts)
 
     def test_balance_reconstructed_backwards(self):
@@ -120,7 +120,7 @@ class TestReconstructBalanceRows:
         nets = {day1: 100.0, day2: 200.0, day3: 50.0}
         # Current balance after all = 1000
         rows = _reconstruct_balance_rows(nets, 1000.0, today)
-        by_date = {r.start.date(): r.mean for r in rows}
+        by_date = {r["start"].date(): r["mean"] for r in rows}
         # day3 end balance = 1000 (current)
         assert by_date[day3] == 1000.0
         # day2 end balance = 1000 - 50 (day3 txn) = 950
@@ -150,7 +150,7 @@ class TestReconstructNetWorthRows:
         balances = {1: 1000.0}
         rows = _reconstruct_net_worth_rows(nets, balances, today)
         assert len(rows) == 1
-        assert rows[0].mean == pytest.approx(1000.0)
+        assert rows[0]["mean"] == pytest.approx(1000.0)
 
     def test_two_accounts_summed(self):
         today = date(2026, 5, 3)
@@ -161,7 +161,7 @@ class TestReconstructNetWorthRows:
         balances = {1: 500.0, 2: 300.0}
         rows = _reconstruct_net_worth_rows(nets, balances, today)
         # Net worth today = 500 + 300 = 800
-        assert rows[-1].mean == pytest.approx(800.0)
+        assert rows[-1]["mean"] == pytest.approx(800.0)
 
     def test_rows_sorted_ascending(self):
         d1 = date(2026, 5, 1)
@@ -169,7 +169,7 @@ class TestReconstructNetWorthRows:
         nets = {1: {d1: 10.0, d2: 20.0}}
         balances = {1: 1000.0}
         rows = _reconstruct_net_worth_rows(nets, balances, d2)
-        starts = [r.start for r in rows]
+        starts = [r["start"] for r in rows]
         assert starts == sorted(starts)
 
 
