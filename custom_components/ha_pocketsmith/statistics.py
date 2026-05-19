@@ -20,7 +20,7 @@ import logging
 import re
 from datetime import datetime, timezone
 
-from homeassistant.components.recorder.models import StatisticData, StatisticMeanType
+from homeassistant.components.recorder.models import StatisticData
 from homeassistant.components.recorder.statistics import async_add_external_statistics
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
@@ -93,7 +93,6 @@ def _insert_account_statistics(hass: HomeAssistant, data: dict, stat_start: date
             hass,
             {
                 "has_sum": False,
-                "mean_type": StatisticMeanType.ARITHMETIC,
                 "name": "%s Balance" % title,
                 "source": DOMAIN,
                 "statistic_id": _account_statistic_id(account_id, _slug(title)),
@@ -122,7 +121,6 @@ def _insert_net_worth_statistic(hass: HomeAssistant, data: dict, stat_start: dat
         hass,
         {
             "has_sum": False,
-            "mean_type": StatisticMeanType.ARITHMETIC,
             "name": "Net Worth",
             "source": DOMAIN,
             "statistic_id": _net_worth_statistic_id(user_id),
@@ -158,7 +156,6 @@ def _insert_category_statistics(hass: HomeAssistant, data: dict, stat_start: dat
             hass,
             {
                 "has_sum": True,
-                "mean_type": StatisticMeanType.NONE,
                 "name": display_name,
                 "source": DOMAIN,
                 "statistic_id": _category_statistic_id(cat_id, _slug(cat_title)),
@@ -184,7 +181,6 @@ def _insert_uncategorised_statistic(hass: HomeAssistant, data: dict, stat_start:
         hass,
         {
             "has_sum": False,
-            "mean_type": StatisticMeanType.ARITHMETIC,
             "name": "Uncategorised Transactions",
             "source": DOMAIN,
             "statistic_id": _uncategorised_statistic_id(user_id),
