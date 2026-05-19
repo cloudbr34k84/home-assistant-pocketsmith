@@ -36,7 +36,7 @@ import logging
 from datetime import date, datetime, timedelta, timezone
 
 import aiohttp
-from homeassistant.components.recorder.models import StatisticData, StatisticMeanType
+from homeassistant.components.recorder.models import StatisticData
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.components.recorder.statistics import async_add_external_statistics
@@ -214,7 +214,6 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict, back
         if rows:
             metadata = {
                 "has_sum": False,
-                "mean_type": StatisticMeanType.ARITHMETIC,
                 "name": "%s Balance" % title,
                 "source": DOMAIN,
                 "statistic_id": statistic_id,
@@ -240,7 +239,6 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict, back
                 hass,
                 {
                     "has_sum": False,
-                    "mean_type": StatisticMeanType.ARITHMETIC,
                     "name": "Net Worth",
                     "source": DOMAIN,
                     "statistic_id": _net_worth_statistic_id(user_id),
@@ -296,7 +294,6 @@ async def _run_backfill_inner(hass: HomeAssistant, coordinator, data: dict, back
                 hass,
                 {
                     "has_sum": True,
-                    "mean_type": StatisticMeanType.NONE,
                     "name": display_name,
                     "source": DOMAIN,
                     "statistic_id": statistic_id,
