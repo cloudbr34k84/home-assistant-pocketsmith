@@ -470,7 +470,7 @@ def _reconstruct_balance_rows(
         row_start = datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=timezone.utc)
         rows.append(StatisticData(start=row_start, mean=round(running, 2)))
 
-    rows.sort(key=lambda r: r.start)
+    rows.sort(key=lambda r: r["start"])
     return rows
 
 
@@ -504,7 +504,7 @@ def _reconstruct_net_worth_rows(
         row_start = datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=timezone.utc)
         rows.append(StatisticData(start=row_start, mean=nw))
 
-    rows.sort(key=lambda r: r.start)
+    rows.sort(key=lambda r: r["start"])
     return rows
 
 
