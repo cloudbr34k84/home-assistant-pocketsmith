@@ -16,7 +16,7 @@ from custom_components.ha_pocketsmith.const import (
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations, recorder_mock):
+def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable custom integrations defined in the test dir."""
     yield
 

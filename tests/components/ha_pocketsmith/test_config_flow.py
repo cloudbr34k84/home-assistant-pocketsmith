@@ -4,6 +4,8 @@ import asyncio
 import pytest
 from unittest.mock import patch
 
+pytestmark = pytest.mark.usefixtures("recorder_mock")
+
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResultType
 
