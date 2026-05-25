@@ -22,7 +22,7 @@
 - Historical backfill that populates long-term statistics graphs from your full transaction history
 - Backfill progress sensor so you can see sweep status on your dashboard
 - Configurable polling interval (1–24 hours) adjustable from the dashboard
-- Repair issues raised automatically for budget overruns and failed backfills
+- Repair issues raised automatically for uncategorised transactions and failed backfills
 - Actions (services) for manual refresh, backfill reset, and budget summary queries
 - No YAML required — fully UI-configured
 
@@ -153,7 +153,20 @@ One sensor per non-transfer category, showing actual spend vs. budget for the cu
 | `percentage_used` | Percentage of budget consumed |
 | `transaction_count` | Number of transactions this month |
 | `is_bill` | Whether this is a bill category |
+| `parent_id` | Parent category ID (if nested) |
 | `parent_title` | Parent category name (if nested) |
+| `grandparent_id` | Grandparent category ID, or `null` if there is no grandparent |
+| `grandparent_title` | Grandparent category name, or `null` |
+| `category_level` | Depth in the category tree (1 = top-level) |
+| `refund_behaviour` | PocketSmith refund handling for this category (string or `null`) |
+| `roll_up` | Whether PocketSmith rolls this category up into its parent |
+| `colour` | Category colour from PocketSmith (string or `null`) |
+| `days_in_month` | Number of days in the current calendar month |
+| `days_elapsed_in_month` | Days elapsed so far this month (including today) |
+| `days_remaining_in_month` | Days remaining in the month |
+| `daily_budget` | `budgeted` ÷ `days_in_month` — the per-day budget allowance |
+| `daily_actual` | `actual` ÷ `days_elapsed_in_month` — the average daily spend so far |
+| `on_track` | `true` when `daily_actual` ≤ `daily_budget`; `null` if either is unavailable |
 
 ---
 
@@ -358,8 +371,9 @@ The integration automatically raises repair issues in **Settings → System → 
 | Issue | Trigger | Resolution |
 |---|---|---|
 | Uncategorised transactions | `uncategorised_count > 0` | Categorise the transactions in PocketSmith |
-| Over budget | Any category exceeds its budget | Review spending in PocketSmith |
 | Backfill failed | An account sweep exhausted all retries | Reset backfill via button or action and restart |
+
+> **Note:** Over-budget categories no longer raise a repair issue (it was not actionable mid-month). Use `binary_sensor.pocketsmith_over_budget` to build your own automations instead — see [Example Automations](#example-automations).
 
 ---
 
@@ -456,6 +470,25 @@ action:
         Groceries is over budget by
         {{ state_attr('sensor.groceries', 'over_by') }}
         {{ state_attr('sensor.groceries', 'currency') }}.
+```
+
+### Warn when daily spend pace is off track mid-month
+
+```yaml
+alias: Groceries Pacing Alert
+trigger:
+  - platform: state
+    entity_id: sensor.groceries
+    attribute: on_track
+    to: false
+action:
+  - action: notify.notify
+    data:
+      title: "Spending Pace"
+      message: >
+        Groceries is spending {{ state_attr('sensor.groceries', 'daily_actual') }}/day
+        against a {{ state_attr('sensor.groceries', 'daily_budget') }}/day budget
+        with {{ state_attr('sensor.groceries', 'days_remaining_in_month') }} days left.
 ```
 
 ---
