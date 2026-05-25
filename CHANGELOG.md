@@ -4,6 +4,13 @@ All notable changes to the PocketSmith Home Assistant integration are documented
 
 ---
 
+## [v0.5.5] - 2026-05-25
+
+### Removed
+- **Over-budget repair issue** — removed the `over_budget` repair issue. It was not actionable by users mid-month and added noise to the HA repairs panel. The `binary_sensor.pocketsmith_over_budget` entity still surfaces this data for anyone who wants to build automations on it.
+
+---
+
 ## [v0.5.4] - 2026-05-25
 
 ### Added

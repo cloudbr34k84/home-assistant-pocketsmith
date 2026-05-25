@@ -123,10 +123,6 @@
       "title": "PocketSmith: {count} uncategorised transaction(s)",
       "description": "You have **{count}** uncategorised transaction(s) in PocketSmith. Categorise them to keep your budget data accurate."
     },
-    "over_budget": {
-      "title": "PocketSmith: over budget in {count} categor(y/ies)",
-      "description": "You are over budget this month in **{count}** categor(y/ies): {categories}. Review your spending in PocketSmith."
-    },
     "backfill_failed": {
       "title": "PocketSmith: historical backfill failed for account {account}",
       "description": "The historical data sweep for account **{account}** failed after multiple retries. Statistics for this account may be incomplete. To retry, go to the integration options, disable and re-enable **Enable historical backfill**, then restart Home Assistant."
