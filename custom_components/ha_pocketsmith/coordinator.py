@@ -302,6 +302,9 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
             parent_id = cat.get("parent_id")
             parent_title = flat_cats[parent_id]["title"] if parent_id and parent_id in flat_cats else None
 
+            grandparent_id = flat_cats[parent_id].get("parent_id") if parent_id and parent_id in flat_cats else None
+            grandparent_title = flat_cats[grandparent_id]["title"] if grandparent_id and grandparent_id in flat_cats else None
+
             budgeted = None
             actual = None
             remaining = None
@@ -382,11 +385,19 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                 remaining = b - a if not over_budget else 0
                 percentage_used = round(a / b * 100, 2) if b > 0 else None
 
+            days_elapsed_in_month = today.day
+            days_remaining_in_month = days_in_month - today.day
+            daily_budget = round(budgeted / days_in_month, 2) if budgeted is not None and days_in_month > 0 else None
+            daily_actual = round(actual / days_elapsed_in_month, 2) if actual is not None and days_elapsed_in_month > 0 else None
+            on_track = bool(daily_actual <= daily_budget) if daily_budget is not None and daily_actual is not None else None
+
             result.append({
                 "category_id": cat_id,
                 "category_title": cat.get("title"),
                 "parent_id": parent_id,
                 "parent_title": parent_title,
+                "grandparent_id": grandparent_id,
+                "grandparent_title": grandparent_title,
                 "is_bill": cat.get("is_bill"),
                 "is_transfer": cat.get("is_transfer"),
                 "budgeted": budgeted,
@@ -398,6 +409,15 @@ class PocketSmithCoordinator(DataUpdateCoordinator):
                 "currency": currency,
                 "transaction_count": monthly_transaction_counts.get(cat_id, 0),
                 "category_level": _category_level(cat_id),
+                "refund_behaviour": cat.get("refund_behaviour"),
+                "roll_up": cat.get("roll_up"),
+                "colour": cat.get("colour"),
+                "days_in_month": days_in_month,
+                "days_elapsed_in_month": days_elapsed_in_month,
+                "days_remaining_in_month": days_remaining_in_month,
+                "daily_budget": daily_budget,
+                "daily_actual": daily_actual,
+                "on_track": on_track,
             })
 
         return result

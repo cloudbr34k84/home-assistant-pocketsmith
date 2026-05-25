@@ -294,6 +294,17 @@ class PocketSmithCategorySensor(CoordinatorEntity, SensorEntity):
             "currency": e.get("currency"),
             "transaction_count": e.get("transaction_count"),
             "category_level": e.get("category_level"),
+            "grandparent_id": e.get("grandparent_id"),
+            "grandparent_title": e.get("grandparent_title"),
+            "refund_behaviour": e.get("refund_behaviour"),
+            "roll_up": e.get("roll_up"),
+            "colour": e.get("colour"),
+            "days_in_month": e.get("days_in_month"),
+            "days_elapsed_in_month": e.get("days_elapsed_in_month"),
+            "days_remaining_in_month": e.get("days_remaining_in_month"),
+            "daily_budget": e.get("daily_budget"),
+            "daily_actual": e.get("daily_actual"),
+            "on_track": e.get("on_track"),
             "is_rollup": False,
         }
 

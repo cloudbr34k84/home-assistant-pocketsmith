@@ -4,6 +4,15 @@ All notable changes to the PocketSmith Home Assistant integration are documented
 
 ---
 
+## [v0.5.4] - 2026-05-25
+
+### Added
+- **Grandparent category attributes** — category sensors now expose `grandparent_id` and `grandparent_title`, resolving the full category hierarchy (category → parent → grandparent).
+- **Category metadata attributes** — surfaced `refund_behaviour`, `roll_up`, and `colour` directly from the PocketSmith category API on each category sensor.
+- **Computed budget pacing attributes** — added `days_in_month`, `days_elapsed_in_month`, `days_remaining_in_month`, `daily_budget`, `daily_actual`, and `on_track` so you can track whether spend is keeping pace with budget within the current month.
+
+---
+
 ## [v0.5.3] - 2026-05-19
 
 ### Fixed
