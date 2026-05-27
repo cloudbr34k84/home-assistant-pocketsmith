@@ -4,6 +4,13 @@ All notable changes to the PocketSmith Home Assistant integration are documented
 
 ---
 
+## [v0.5.6] - 2026-05-27
+
+### Fixed
+- Fixed uncategorised transactions repair notification to link to `https://my.pocketsmith.com/login` instead of the incorrect app.pocketsmith.com URL.
+
+---
+
 ## [v0.5.5] - 2026-05-25
 
 ### Removed

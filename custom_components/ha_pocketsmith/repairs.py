@@ -29,7 +29,7 @@ def _update_uncategorised_issue(hass: HomeAssistant, data: dict) -> None:
             severity=IssueSeverity.WARNING,
             translation_key=ISSUE_UNCATEGORISED,
             translation_placeholders={"count": str(count)},
-            learn_more_url="https://app.pocketsmith.com",
+            learn_more_url="https://my.pocketsmith.com/login",
         )
     else:
         async_delete_issue(hass, DOMAIN, ISSUE_UNCATEGORISED)
