@@ -9,9 +9,7 @@ from homeassistant.helpers import config_validation as cv
 from .actions import async_register_actions, async_unregister_actions
 from .backfill import async_trigger_backfill
 from .const import (
-    CONF_ENABLE_BACKFILL,
     CONF_UPDATE_INTERVAL_HOURS,
-    DEFAULT_ENABLE_BACKFILL,
     DEFAULT_UPDATE_INTERVAL_HOURS,
     DOMAIN,
     BackfillState,
@@ -62,25 +60,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: PocketSmithConfigEntry) 
     await async_trigger_backfill(hass, coordinator, coordinator.data, entry, entry.runtime_data.backfill)
 
     async_register_actions(hass)
-    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
     return True
-
-
-async def _async_options_updated(hass: HomeAssistant, entry: PocketSmithConfigEntry) -> None:
-    """Handle options updates — adjust coordinator interval and re-trigger backfill if needed."""
-    coordinator: PocketSmithCoordinator = entry.runtime_data.coordinator
-
-    new_interval = _update_interval_from_options(entry)
-    if coordinator.update_interval != new_interval:
-        _LOGGER.debug(
-            "PocketSmith polling interval changed to %s hours",
-            entry.options.get(CONF_UPDATE_INTERVAL_HOURS, DEFAULT_UPDATE_INTERVAL_HOURS),
-        )
-        coordinator.update_interval = new_interval
-
-    if entry.options.get(CONF_ENABLE_BACKFILL, DEFAULT_ENABLE_BACKFILL):
-        await async_trigger_backfill(hass, coordinator, coordinator.data, entry, entry.runtime_data.backfill)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: PocketSmithConfigEntry) -> bool:

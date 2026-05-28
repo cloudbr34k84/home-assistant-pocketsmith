@@ -4,6 +4,13 @@ All notable changes to the PocketSmith Home Assistant integration are documented
 
 ---
 
+## [v0.5.7] - 2026-05-28
+
+### Changed
+- Removed config entry update listener (`add_update_listener`) to comply with HA 2026.6 deprecation. Using an update listener alongside reloading methods in a config flow (reauth/reconfigure) can cause double-reloads and is deprecated — error in 2026.12. Options changes now take effect via the reload that HA triggers automatically when the options flow saves.
+
+---
+
 ## [v0.5.6] - 2026-05-27
 
 ### Fixed
